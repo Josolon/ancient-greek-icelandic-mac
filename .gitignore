@@ -1,0 +1,21 @@
+# macOS system clutter
+.DS_Store
+
+# Heavy source databases (rebuild from ancient-greek-mac / download glossary)
+data/lsj.db
+data/morph.db
+data/lsj_is.db
+data/IS-EN_glossary.tsv
+
+# Generated dictionary source XML (~200MB)
+src/GreekIcelandicDictionary.xml
+
+# Apple Dictionary Development Kit build artifacts
+src/objects/
+src/*.dictionary
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
