@@ -1,5 +1,26 @@
 # Ancient Greek ↔ Icelandic Dictionary
 
+> **⚠️ Work in progress — not ready for general use.** This is an early,
+> honest-effort attempt at a hard problem (there is no existing
+> Ancient Greek-Icelandic dictionary to build from), not a finished
+> reference work. Please read the whole "How this works" section below
+> before relying on anything it outputs. In short:
+> - It's a **glossary of word-level equivalents**, not a dictionary of
+>   fluent Icelandic definitions.
+> - Coverage is partial by design: ~52% of entries get at least one
+>   confident Icelandic word, ~18% get every sense translated, and the rest
+>   fall back to English-only because nothing confident was found.
+> - Even where it does return an Icelandic word, it can be the **wrong
+>   sense** of a polysemous headword (the two independent resources this
+>   bridges don't share any notion of "the same sense") — always cross-check
+>   against the English LSJ gloss shown alongside it.
+> - The reverse (Icelandic → Greek) direction is coarser still, and LSJ's
+>   own spelling/dialect variants of "the same" Greek word show up as
+>   separate results rather than being collapsed.
+>
+> Contributions on translation quality, phrase segmentation, and citation
+> filtering are very welcome — see Contributing below.
+
 Two `.dictionary` plugins for the native macOS Dictionary app and
 system-wide "Look Up" feature, built from the **LSJ Ancient Greek lexicon**
 (110,826 entries):
