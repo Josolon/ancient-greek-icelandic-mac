@@ -30,8 +30,14 @@ p.gloss-is {
     margin: 0 0 4px 0;
 }
 
-/* Original English LSJ gloss, shown only when the Icelandic bridge
-   translation was incomplete (some words had no glossary match) */
+p.gloss-missing {
+    color: #999;
+    font-style: italic;
+}
+
+/* Original English LSJ gloss -- always shown, since the Icelandic side is a
+   partial glossary (some senses have no confident glossary match) rather
+   than a complete translation */
 p.gloss-en {
     margin: 0;
     color: #666;

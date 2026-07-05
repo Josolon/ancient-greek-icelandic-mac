@@ -66,7 +66,7 @@ def build_dictionary():
 
     print("Loading Icelandic bridge glosses...")
     is_cursor = is_conn.cursor()
-    is_cursor.execute("SELECT id, definitions_is, fully_translated FROM definitions_is")
+    is_cursor.execute("SELECT id, definitions_is, any_translated FROM definitions_is")
     is_by_id = {row[0]: (row[1], row[2]) for row in is_cursor.fetchall()}
 
     with open(OUTPUT_XML_PATH, 'w', encoding='utf-8') as xml:
@@ -86,7 +86,7 @@ def build_dictionary():
             raw_lemma_norm = row[2]
             raw_def_en = row[3]
 
-            is_def_json, fully_translated = is_by_id.get(row[0], (None, 0))
+            is_def_json, any_translated = is_by_id.get(row[0], (None, 0))
 
             safe_title = sanitize_apple_key(raw_lemma)
             if not safe_title:
@@ -157,14 +157,16 @@ def build_dictionary():
                 except (json.JSONDecodeError, AttributeError):
                     return html.escape(str(raw_json))
 
-            clean_definition_is = render_defs(is_def_json) if is_def_json else "(engin þýðing / no translation)"
             clean_definition_en = render_defs(raw_def_en)
 
             xml.write(f'        <h1 class="entry-lemma">{html.escape(raw_lemma)}</h1>\n')
             xml.write(f'        <div class="definition">\n')
-            xml.write(f'            <p class="gloss-is">{clean_definition_is}</p>\n')
-            if not fully_translated:
-                xml.write(f'            <p class="gloss-en">{clean_definition_en}</p>\n')
+            if any_translated and is_def_json:
+                clean_definition_is = render_defs(is_def_json)
+                xml.write(f'            <p class="gloss-is"><b>ÍS:</b> {clean_definition_is}</p>\n')
+            else:
+                xml.write(f'            <p class="gloss-is gloss-missing">Engin trygg þýðing í orðasafninu.</p>\n')
+            xml.write(f'            <p class="gloss-en"><b>EN (LSJ):</b> {clean_definition_en}</p>\n')
             xml.write(f'        </div>\n')
 
             if is_noun_adj and noun_grid:

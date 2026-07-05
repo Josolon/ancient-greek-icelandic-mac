@@ -7,8 +7,9 @@ data/morph.db
 data/lsj_is.db
 data/IS-EN_glossary.tsv
 
-# Generated dictionary source XML (~200MB)
+# Generated dictionary source XML (~200MB forward, smaller reverse)
 src/GreekIcelandicDictionary.xml
+src/IcelandicGreekDictionary.xml
 
 # Apple Dictionary Development Kit build artifacts
 src/objects/

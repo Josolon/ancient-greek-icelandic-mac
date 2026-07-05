@@ -1,10 +1,15 @@
-# Ancient Greek → Icelandic Dictionary
+# Ancient Greek ↔ Icelandic Dictionary
 
-A `.dictionary` plugin for the native macOS Dictionary app and system-wide
-"Look Up" feature, glossing the **LSJ Ancient Greek lexicon** (110,826
-entries) into Icelandic.
+Two `.dictionary` plugins for the native macOS Dictionary app and
+system-wide "Look Up" feature, built from the **LSJ Ancient Greek lexicon**
+(110,826 entries):
 
-## How translation works — read this before relying on a gloss
+* **AncientGreekIcelandicDictionary** — Greek headword → Icelandic glossary
+  (+ full English LSJ gloss for reference).
+* **IcelandicGreekDictionary** — Icelandic headword → Ancient Greek word(s),
+  a reverse index inverted from the forward glossary.
+
+## How this works — read this before relying on a gloss
 
 There is no existing Ancient Greek–Icelandic dictionary to build from, so
 this project bridges two independent resources:
@@ -13,57 +18,76 @@ this project bridges two independent resources:
    short English definitions — reused from the companion
    [`ancient-greek-mac`](https://github.com/Josolon/ancient-greek-mac) project.
 2. The **CLARIN IS-EN glossary**, a bilingual English↔Icelandic word list with
-   confidence scores per translation pair — reused from
+   per-pair confidence scores and method-evidence counts — reused from
    [`icelandic-english-dictionary-mac`](https://github.com/Josolon/icelandic-english-dictionary-mac).
 
-`scripts/translate_definitions.py` takes each LSJ English gloss (e.g. *"not
-to be injured, inviolable"*), splits it into phrases, and translates each
-phrase by looking it up whole first, then falling back to word-by-word
-substitution using the best-scored Icelandic candidate for each English
-word (`scripts/bridge_lookup.py`).
+This is deliberately built as **a glossary, not a dictionary**: the goal is
+a list of trustworthy Icelandic word equivalents for each Greek headword,
+not fluent Icelandic prose. `scripts/bridge_lookup.py` is precision-first —
+it returns an Icelandic candidate only when the glossary gives real
+evidence for it (checking translation score *and* how much independent
+evidence backs that score, filtering out proper-noun/acronym outliers, and
+lemmatizing English inflected forms so e.g. "eyes" inherits "eye"'s much
+better-attested translation instead of a weak one-off alignment). When it
+isn't confident, it returns nothing rather than guessing.
 
-**This is gloss-substitution, not fluent translation.** No LLM and no human
-translator touched the Icelandic text — it's mechanical word/phrase
-substitution through a bilingual word list. Expect:
-- Correct simple entries: *ἵππος* → "hestur"
-- Word-order and inflection issues: Icelandic isn't just re-ordered English,
-  so multi-word glosses often read like pidgin ("einn kvörtun af hinn skjár"
-  for "a complaint of the eyes" — "skjár" is a mistranslation of "eyes" via
-  an ambiguous glossary entry, not "auga/augu").
-- Missing words: if the glossary has no entry for an English word, it's left
-  untranslated in place.
+`scripts/translate_definitions.py` then builds the glossary sense-by-sense:
+each LSJ sense (e.g. *"king, chief"*) is split into short phrases, and each
+phrase is translated independently. A phrase that can't be translated
+confidently is simply **omitted from the Icelandic side** — not force
+-translated word-by-word into pidgin. If a sense has no confident
+translation at all, the original English is kept so no information is
+silently dropped; the compiled dictionary always shows the full English LSJ
+gloss beneath the Icelandic glossary for reference and to catch dropped
+senses.
 
-Every entry whose Icelandic gloss required an English fallback word is
-flagged internally (`fully_translated = 0` in `data/lsj_is.db`), and the
-compiled dictionary shows the original English LSJ gloss underneath the
-Icelandic one in those cases, so you can sanity-check it. About 60% of
-entries translate with no fallback words needed.
+Coverage, from the current build:
+- 30.6% of entries: every sense, every phrase, translated
+- 68.2% of entries: at least a partial Icelandic glossary
+- 31.8% of entries: no confident translation at all (English-only fallback)
 
-**Use this as a first-pass aid for recognizing a Greek word's rough meaning,
-not as a citable Icelandic definition.** Improving translation quality (better
-phrase segmentation, sense disambiguation, POS-aware lookup) is the most
-valuable kind of contribution here.
+**Use the Icelandic side as a fast way to recognize a Greek word's rough
+meaning, not as a citable definition.** The English LSJ gloss alongside it
+is the authoritative source.
+
+### The reverse direction (Icelandic → Greek) is coarser still
+
+`scripts/build_reverse_xml.py` inverts the forward glossary: every
+single-word Icelandic gloss becomes a headword pointing back to the Greek
+word(s) that produced it (multi-word glosses aren't invertible onto one
+headword, so only single words are indexed). Two things fall out of this
+that are inherent to the data, not bugs:
+- LSJ carries many diacritic/dialect spelling variants of what is
+  linguistically "the same" Greek word as separate headwords, so a lookup
+  like "hestur" returns a cluster of near-duplicate forms (ἵππος, ἱππος,
+  Ἵππος, ...) rather than one clean entry.
+- No morphology tables in this direction — the headword is Icelandic, not
+  Greek, so Morpheus declension data doesn't apply (same scope decision as
+  `icelandic-nordic-dictionary-mac`'s reverse bundles).
 
 ## ✨ Features
 
-* **110k LSJ entries**, bridge-glossed into Icelandic.
+* **110k LSJ entries**, glossed into Icelandic where the bridge is confident.
+* **9,611 Icelandic headwords** in the reverse index.
 * **System Integration:** works natively with macOS "Look Up".
-* **Morphology tables:** noun declensions and verb principal parts, reused
-  directly from `ancient-greek-mac`'s Morpheus data. Case/number labels are
-  shown in Icelandic (Nefnifall, Eignarfall, Þágufall, Þolfall, Ávarpsfall /
-  Eintala, Tvítala, Fleirtala) since these are standard school-taught terms;
-  verb tense/voice labels are left in English pending a settled Icelandic
-  classicist convention — see Contributing.
-* **Transparency:** low-confidence glosses show the original English LSJ
-  definition alongside the Icelandic bridge translation.
+* **Morphology tables** (forward direction only): noun declensions and verb
+  principal parts, reused directly from `ancient-greek-mac`'s Morpheus data.
+  Case/number labels are shown in Icelandic (Nefnifall, Eignarfall,
+  Þágufall, Þolfall, Ávarpsfall / Eintala, Tvítala, Fleirtala) since these
+  are standard school-taught terms; verb tense/voice labels are left in
+  English pending a settled Icelandic classicist convention — see
+  Contributing.
+* **Transparency:** the full English LSJ gloss is always shown alongside
+  the Icelandic glossary, so nothing is silently hidden behind a
+  translation guess.
 
 ## 📦 Installation (For End Users)
 
 1. Download the latest release from the [Releases](https://github.com/Josolon/ancient-greek-icelandic-mac/releases) page.
-2. Unzip to get `AncientGreekIcelandicDictionary.dictionary`.
+2. Unzip to get `AncientGreekIcelandicDictionary.dictionary` and/or `IcelandicGreekDictionary.dictionary`.
 3. Open Finder, press `Cmd+Shift+G`, navigate to `~/Library/Dictionaries/`.
-4. Drag the `.dictionary` folder there.
-5. Open Dictionary.app → Settings → enable "Forngríska (LSJ) - Íslenska".
+4. Drag the `.dictionary` folder(s) there.
+5. Open Dictionary.app → Settings → enable "Forngríska (LSJ) - Íslenska" and/or "Íslenska - Forngríska (LSJ, öfug leit)".
 
 ## 🛠️ Building from Source
 
@@ -78,15 +102,21 @@ valuable kind of contribution here.
 ### Build steps
 
 ```bash
-# 1. Gloss-translate LSJ's English definitions into Icelandic (fast, ~1s)
+# 1. Build the Icelandic glossary from LSJ's English definitions (fast, ~1s)
 python3 scripts/translate_definitions.py
 
-# 2. Generate the Apple Dictionary XML (a few seconds, ~200MB output)
-python3 scripts/build_xml.py
+# 2. Generate both Apple Dictionary XML sources
+python3 scripts/build_xml.py            # forward: Greek -> Icelandic
+python3 scripts/build_reverse_xml.py    # reverse: Icelandic -> Greek
 
-# 3. Compile and install
+# 3. Compile and install both bundles
 cd src && make install
 ```
+
+Note: Apple's `build_dict.sh` fetches `PropertyList-1.0.dtd` from apple.com
+on every invocation; a transient network hiccup can abort a build mid-way
+with an "unable to parse dict.plist" error (same issue documented in
+`icelandic-nordic-dictionary-mac`). Just re-run `make install`.
 
 ## 📁 Project Structure
 
@@ -96,27 +126,27 @@ ancient-greek-icelandic-mac/
 │   ├── lsj.db                  # LSJ entries [gitignored, from ancient-greek-mac]
 │   ├── morph.db                # Morpheus morphology [gitignored, from ancient-greek-mac]
 │   ├── IS-EN_glossary.tsv      # EN<->IS bridge glossary [gitignored, from CLARIN]
-│   └── lsj_is.db               # Generated Icelandic glosses [gitignored, regenerate]
+│   └── lsj_is.db               # Generated Icelandic glossary [gitignored, regenerate]
 ├── scripts/
-│   ├── bridge_lookup.py        # EN->IS phrase/word lookup against the glossary
-│   ├── translate_definitions.py # Runs every LSJ gloss through the bridge
-│   └── build_xml.py            # Generates the Apple Dictionary XML
+│   ├── bridge_lookup.py        # Precision-first EN->IS phrase/word lookup
+│   ├── translate_definitions.py # Builds the Icelandic glossary sense-by-sense
+│   ├── build_xml.py            # Forward direction: Greek -> Icelandic XML
+│   └── build_reverse_xml.py    # Reverse direction: Icelandic -> Greek XML
 ├── src/
-│   ├── GreekIcelandicDictionary.xml   # Generated [gitignored]
-│   ├── GreekIcelandicDictionary.css
-│   ├── GreekIcelandicDictionary.plist
-│   ├── Makefile
+│   ├── GreekIcelandicDictionary.{xml,css,plist}      # forward bundle [xml gitignored]
+│   ├── IcelandicGreekDictionary.{xml,plist}          # reverse bundle [xml gitignored]
+│   ├── Makefile                # builds + installs both bundles
 │   └── objects/                # Build artifacts [gitignored]
 └── README.md
 ```
 
 ## 🤝 Contributing
 
-* **Translation quality:** the biggest opportunity. Better phrase
-  segmentation, POS-aware sense disambiguation, or filtering out
-  proper-noun/acronym outliers from the glossary (see `_OVERRIDES` in
-  `scripts/bridge_lookup.py` for the pattern already used to fix the worst
-  offenders like "it" → "upplýsingatækni") all directly improve output.
+* **Translation quality:** the biggest opportunity. `scripts/bridge_lookup.py`
+  already lemmatizes English inflected forms and penalizes proper-noun/
+  acronym outliers and self-referential candidates — extending that (better
+  phrase segmentation, real POS tagging of LSJ senses instead of a POS-less
+  guess) directly improves coverage and precision.
 * **Icelandic classical-grammar terminology:** if you know the standard
   Icelandic terms for Greek verb tense/voice/mood (as taught in Icelandic
   classics courses, if such a convention exists), replacing the English
@@ -139,5 +169,5 @@ See [CREDITS.md](CREDITS.md) for full attribution.
 
 Dual-license, same structure as `ancient-greek-mac`: code under MIT, data
 under CC BY-SA 4.0 (LSJ) / CC BY 4.0 (glossary) / CC BY-SA 4.0 (this
-project's generated Icelandic glosses, since they derive from CC BY-SA
-LSJ text). See [LICENSE](LICENSE) for full details.
+project's generated Icelandic glossary and reverse index, since they derive
+from CC BY-SA LSJ text). See [LICENSE](LICENSE) for full details.

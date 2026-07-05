@@ -1,11 +1,14 @@
 # Credits
 
-This project builds an Ancient Greek -> Icelandic dictionary by bridging two
-independent resources: an English lexicon of Ancient Greek, and a bilingual
-English-Icelandic glossary. No direct Ancient Greek-Icelandic dictionary
-exists, so every gloss here is a **word/phrase-substitution bridge
-translation**, not idiomatic Icelandic prose written by a lexicographer or
-translated by a language model. See "How translation works" in README.md.
+This project builds an Ancient Greek <-> Icelandic dictionary (both
+directions) by bridging two independent resources: an English lexicon of
+Ancient Greek, and a bilingual English-Icelandic glossary. No direct Ancient
+Greek-Icelandic dictionary exists, so every gloss here is a **precision-first
+word/phrase-substitution bridge translation** -- a glossary of confident
+equivalents, not idiomatic Icelandic prose written by a lexicographer or
+translated by a language model. The reverse (Icelandic -> Greek) direction is
+inverted from the same generated glossary. See "How this works" in
+README.md.
 
 ## Ancient Greek Lexicon (LSJ)
 
