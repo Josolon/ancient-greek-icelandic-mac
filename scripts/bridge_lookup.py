@@ -18,6 +18,17 @@ Junk signatures observed in the glossary and filtered here:
     capitalized candidates and EN-POS "Proper noun" rows for lowercase
     English words.
   - "it" -> "upplýsingatækni": acronym expansions. Handled by _OVERRIDES.
+  - "shade" -> "hansagardína" (a curtain brand, score 1.0 on 3 hits) beating
+    "skuggi" (score 0.14 but 22 hits): a single high score with almost no
+    supporting evidence isn't more trustworthy than a lower score with lots
+    of it. Fixed by MIN_EVIDENCE, a hard floor applied before ranking, not
+    just a soft down-weight.
+  - "a tyrant's dwelling" -> "harðstjóri suður bústaður": concatenating
+    separately-looked-up words to cover a multi-word phrase produces
+    ungrammatical Icelandic even when each word is individually a valid
+    translation. Fixed by removing word-by-word reconstruction entirely --
+    translate_glossary_phrase() only ever returns a single looked-up word or
+    an exact whole-phrase glossary match, never a synthesized combination.
 
 TSV columns (1-indexed per data/IS-EN_glossary.READ.ME):
   1 Icelandic  2 English  3 IS POS  4 EN POS  5 unit-type
@@ -40,20 +51,6 @@ _OVERRIDES = {
     "one": "einn", "first": "fyrstur", "word": "orð", "not": "ekki",
     "no": "enginn", "yes": "já", "it": "það", "this": "þessi", "that": "sá",
 }
-
-# Words that block the word-by-word fallback: a piece containing any of
-# these (beyond a stripped leading article) needs real syntax to translate,
-# so we keep it in English rather than emit pidgin.
-FUNCTION_WORDS = frozenset("""
-    a an the of to in on at by with without for from as into upon among
-    is are was were be been being am do does did have has had
-    who whom whose which what that this these those it its he she his her
-    they them their one's oneself himself herself itself themselves
-    and or nor but if than then so such not no any all each other another
-    up down out off over under between before after against through
-    can could shall should will would may might must
-    's i.e e.g etc esp
-""".split())
 
 _PLURAL_IRREGULAR = {
     "eyes": "eye", "feet": "foot", "teeth": "tooth", "men": "man",
@@ -129,17 +126,27 @@ def _lemma_variants(word):
         yield lower[:-3] + "e"  # loving -> love
 
 
-def _ranked(en_word, cands, en_pos_hint=None):
-    """Rank a candidate dict by adjusted quality, best first."""
+# A candidate needs at least this many independent method-hits to be
+# considered at all, regardless of its score. Without this floor, a lone
+# corpus-alignment artifact with score 1.0 (e.g. "shade" -> "hansagardína",
+# 3 hits) beats a well-attested real translation with a lower score but far
+# more evidence ("shade" -> "skuggi", 22 hits, score 0.14) -- damping the
+# score alone isn't enough to fix that, evidence has to gate first.
+MIN_EVIDENCE = 5
+
+
+def _ranked(en_word, cands, en_pos_hint=None, min_evidence=MIN_EVIDENCE):
+    """Rank a candidate dict by adjusted quality, best first. Candidates
+    below min_evidence are dropped outright, not just down-weighted."""
     en_lower_word = en_word[0].islower() if en_word else True
-    has_lowercase = any(ic[0].islower() for ic in cands)
+    qualified = {ic: c for ic, c in cands.items() if c["evidence"] >= min_evidence}
+    if not qualified:
+        return []
+    has_lowercase = any(ic[0].islower() for ic in qualified)
 
     def quality(item):
         icelandic, c = item
         q = c["score"]
-        # Evidence damping: score 1.0 on 3 method-hits is far weaker than
-        # score 0.35 on 40 hits. Saturates around 12 hits.
-        q *= min(1.0, 0.25 + c["evidence"] / 12.0)
         if en_lower_word and icelandic[0].isupper() and has_lowercase:
             q *= 0.15
         if en_lower_word and c["en_pos"] == "Proper noun":
@@ -153,7 +160,7 @@ def _ranked(en_word, cands, en_pos_hint=None):
                 q *= 0.7
         return q
 
-    return sorted(cands.items(), key=quality, reverse=True)
+    return sorted(qualified.items(), key=quality, reverse=True)
 
 
 def _candidates_for(word):
@@ -178,7 +185,7 @@ def _candidates_for(word):
 
 
 @lru_cache(maxsize=200_000)
-def top_candidates(word, en_pos_hint=None, n=2, min_quality_evidence=2):
+def top_candidates(word, en_pos_hint=None, n=2):
     """Up to n Icelandic candidates for one English word, best first.
     Returns a list of (icelandic, is_pos) tuples; empty if nothing trustworthy."""
     lower = word.lower()
@@ -192,8 +199,6 @@ def top_candidates(word, en_pos_hint=None, n=2, min_quality_evidence=2):
     out = []
     best_score = None
     for icelandic, c in ranked:
-        if c["evidence"] < min_quality_evidence:
-            continue
         if best_score is None:
             best_score = c["score"]
             out.append((icelandic, c["is_pos"]))
@@ -206,18 +211,19 @@ def top_candidates(word, en_pos_hint=None, n=2, min_quality_evidence=2):
 
 @lru_cache(maxsize=200_000)
 def phrase_match(phrase, en_pos_hint=None):
-    """Whole-phrase glossary match only (no word-by-word). Returns the best
-    Icelandic equivalent or None."""
+    """Whole-phrase glossary match only (no word-by-word reconstruction).
+    These are real editorial multiword entries (idioms like "run away" ->
+    "strjúka"), so they get a lower evidence bar than single-word lookups --
+    but still a bar, to keep out one-off corpus-alignment noise."""
     table = _load()
     key = " ".join(phrase.lower().split())
     cands = table.get(key)
     if not cands:
         return None
-    ranked = _ranked(phrase, cands, en_pos_hint)
-    icelandic, c = ranked[0]
-    if c["evidence"] < 1:
+    ranked = _ranked(phrase, cands, en_pos_hint, min_evidence=2)
+    if not ranked:
         return None
-    return icelandic
+    return ranked[0][0]
 
 
 _LEADING_ARTICLE_RE = re.compile(r"^(to|an?|the)\s+", re.IGNORECASE)
@@ -230,40 +236,34 @@ def translate_glossary_phrase(phrase, en_pos_hint=None):
     confident enough evidence -- callers should keep the English original in
     that case rather than force a translation.
 
-    Strategy: strip a single leading "to/a/an/the" (LSJ infinitive/article
-    glosses), try a whole-phrase glossary match, then allow word-by-word
-    substitution ONLY for short phrases (<=3 tokens) built entirely from
-    content words (plus "and"/"or") -- phrases needing real function-word
-    grammar are refused rather than turned into pidgin.
+    Deliberately narrow: after stripping a leading "to/a/an/the" (LSJ
+    infinitive/article glosses), this only succeeds for (a) an exact
+    whole-phrase glossary match, or (b) a single remaining word. It does
+    NOT reconstruct multi-word phrases by concatenating separately-looked-up
+    words -- e.g. "retiring" -> "hörfa" (withdraw) and "part" -> "hluti" are
+    each individually defensible, but "hörfa hluti" is not grammatical
+    Icelandic and nobody chose that combination on purpose. A polysemous
+    Greek word's other multi-word senses just don't get an Icelandic gloss
+    for that particular sense -- see README.
     """
     stripped = _LEADING_ARTICLE_RE.sub("", phrase.strip())
     if not stripped:
         return None
 
-    direct = phrase_match(stripped, en_pos_hint)
-    if direct:
-        return direct
-
     tokens = WORD_RE.findall(stripped)
-    if not tokens or len(tokens) > 3:
-        return None
-    if any(t.lower() in FUNCTION_WORDS and t.lower() not in ("and", "or") for t in tokens):
-        return None
+    if len(tokens) == 1:
+        # Single remaining word: always go through top_candidates, which
+        # applies the full MIN_EVIDENCE bar. phrase_match's lower bar exists
+        # for genuine multiword idioms and would let noise back in here
+        # (e.g. "shade" matching the same weakly-attested table entry that
+        # top_candidates would correctly reject).
+        cands = top_candidates(tokens[0], en_pos_hint, n=1)
+        return cands[0][0] if cands else None
 
-    out = []
-    for t in tokens:
-        low = t.lower()
-        if low == "and":
-            out.append("og")
-            continue
-        if low == "or":
-            out.append("eða")
-            continue
-        cands = top_candidates(t, en_pos_hint, n=1)
-        if not cands:
-            return None
-        out.append(cands[0][0])
-    return " ".join(out)
+    if len(tokens) > 1:
+        return phrase_match(stripped, en_pos_hint)
+
+    return None
 
 
 if __name__ == "__main__":

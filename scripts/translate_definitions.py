@@ -10,6 +10,14 @@ that translate become the Icelandic gloss for that sense; phrases that don't
 are simply omitted from the Icelandic side (not force-translated word by
 word). If NONE of a sense's phrases translate, the original English sense
 is kept as-is so no information is silently lost.
+
+Before any of that, _is_lsj_apparatus() filters out phrases that were never
+real English glosses to begin with: LSJ's short-definition field also
+carries cross-references to other headwords, citation sigla, and Latin,
+e.g. "πουλύς, πουλύ,
+Ion. for πολύς, ... Ep., but not in Ion. Prose." A
+naive translator sees "for" and abbreviation tokens and can end up emitting
+something like "v" as if it were a real gloss. These get skipped outright.
 """
 import json
 import re
@@ -23,11 +31,42 @@ OUT_DB_PATH = "data/lsj_is.db"
 
 _SPLIT_RE = re.compile(r"\s*[,;]\s*")
 
+_GREEK_RE = re.compile(r"[Ͱ-Ͽἀ-῿]")
+_APPARATUS_RE = re.compile(
+    r"\b(cf|sq|v|q\.v|etc|Ion|Ep|Dor|Att|Hom|Hsch|Poet|Trag|Com)\.|"
+    r"\bsee\b|\bcf\b",
+    re.IGNORECASE,
+)
+# Author-abbreviation sigla (e.g. "Plu." for Plutarch, "D.H." for Dionysius
+# of Halicarnassus) are effectively unbounded across LSJ's citation
+# apparatus -- rather than enumerate them, a capitalized 1-4 letter token
+# immediately followed by a period is itself a strong citation signature
+# that basically never occurs in a real English gloss.
+_CITATION_SIGLUM_RE = re.compile(r"\b[A-Z][a-zA-Z]{0,3}\.")
+
+
+def _is_lsj_apparatus(phrase):
+    """True if `phrase` is LSJ editorial apparatus (cross-reference,
+    citation, dialect note) rather than an actual English gloss."""
+    if _GREEK_RE.search(phrase):
+        return True
+    if _APPARATUS_RE.search(phrase):
+        return True
+    if _CITATION_SIGLUM_RE.search(phrase):
+        return True
+    if any(ch.isdigit() for ch in phrase):
+        return True
+    letters = re.sub(r"[^A-Za-z]", "", phrase)
+    if len(letters) <= 2:
+        return True
+    return False
+
 
 def translate_sense(sense_text):
     """Returns (icelandic_or_none, any_translated, all_translated) for one
     LSJ sense string."""
     phrases = [p for p in _SPLIT_RE.split(sense_text) if p.strip()]
+    phrases = [p for p in phrases if not _is_lsj_apparatus(p)]
     if not phrases:
         return None, False, False
 

@@ -26,25 +26,53 @@ a list of trustworthy Icelandic word equivalents for each Greek headword,
 not fluent Icelandic prose. `scripts/bridge_lookup.py` is precision-first —
 it returns an Icelandic candidate only when the glossary gives real
 evidence for it (checking translation score *and* how much independent
-evidence backs that score, filtering out proper-noun/acronym outliers, and
-lemmatizing English inflected forms so e.g. "eyes" inherits "eye"'s much
-better-attested translation instead of a weak one-off alignment). When it
-isn't confident, it returns nothing rather than guessing.
+evidence backs that score — a hard evidence floor, not just a soft
+down-weight, since a lone corpus-alignment artifact with a perfect score
+can otherwise outrank a well-attested word with a lower one; filtering out
+proper-noun/acronym outliers; and lemmatizing English inflected forms so
+e.g. "eyes" inherits "eye"'s much better-attested translation instead of a
+weak one-off alignment). When it isn't confident, it returns nothing rather
+than guessing.
 
-`scripts/translate_definitions.py` then builds the glossary sense-by-sense:
-each LSJ sense (e.g. *"king, chief"*) is split into short phrases, and each
-phrase is translated independently. A phrase that can't be translated
-confidently is simply **omitted from the Icelandic side** — not force
--translated word-by-word into pidgin. If a sense has no confident
-translation at all, the original English is kept so no information is
-silently dropped; the compiled dictionary always shows the full English LSJ
-gloss beneath the Icelandic glossary for reference and to catch dropped
-senses.
+`scripts/translate_definitions.py` builds the glossary sense-by-sense: each
+LSJ sense (e.g. *"king, chief"*) is split into short phrases, and each
+phrase is translated independently. Two hard rules keep this from
+regressing into pidgin:
+
+1. **No word-by-word phrase reconstruction.** A phrase translates only if
+   it's a single word, or an exact whole-phrase match already established
+   in the glossary (a real idiom, like "run away" → "strjúka") — never a
+   concatenation of separately-looked-up words. Each word in "a tyrant's
+   dwelling" might translate fine in isolation, but "harðstjóri suður
+   bústaður" isn't Icelandic; nobody chose that combination on purpose, so
+   it's refused rather than emitted. This means a polysemous word's
+   multi-word senses often don't get an Icelandic gloss at all — the
+   glossary favors dropping a sense over fabricating one.
+2. **LSJ's own apparatus is filtered out before translation is attempted.**
+   LSJ's short-definition field also carries cross-references to other
+   headwords, citation sigla, and page/chapter numbers (e.g. *"Ion. for
+   πολύς... Ep."* or *"D.H. 6.17, Plu. Marc. 3, etc."*) — none of that is
+   an actual English gloss, and translating it produces nonsense results
+   like a citation abbreviation becoming a real Icelandic word. These are
+   detected (Greek characters, digits, capitalized citation sigla) and
+   skipped outright.
+
+A phrase that can't be confidently translated is simply **omitted from the
+Icelandic side**. If a sense has no confident translation at all, the
+original English is kept so no information is silently dropped; the
+compiled dictionary always shows the full English LSJ gloss beneath the
+Icelandic glossary for reference and to catch dropped senses.
 
 Coverage, from the current build:
-- 30.6% of entries: every sense, every phrase, translated
-- 68.2% of entries: at least a partial Icelandic glossary
-- 31.8% of entries: no confident translation at all (English-only fallback)
+- 17.5% of entries: every sense, every phrase, translated
+- 52.1% of entries: at least a partial Icelandic glossary
+- 47.9% of entries: no confident translation at all (English-only fallback)
+
+Coverage is lower than an earlier version of this project, on purpose —
+that version reconstructed multi-word phrases and let low-evidence
+candidates through, which covered more entries but with real grammatical
+and semantic garbage mixed in throughout (see git history if curious what
+that looked like). This version trades coverage for not lying to you.
 
 **Use the Icelandic side as a fast way to recognize a Greek word's rough
 meaning, not as a citable definition.** The English LSJ gloss alongside it
