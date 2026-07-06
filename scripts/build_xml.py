@@ -5,6 +5,20 @@ data/lsj_is.db, produced by translate_definitions.py.
 
 Adapted from ancient-greek-mac/scripts/build_xml.py -- see that project for
 the original English-only version this is derived from.
+
+LSJ's TEI-XML parsing produced many rows in data/lsj.db that are pure
+duplicates of each other under a different accent placement or
+capitalization -- e.g. logos/logos/Logos/Logos, five rows, byte-identical
+definitions text. This isn't homonyms sharing a spelling, it's the same
+headword counted multiple times, and it made "Look Up" show the same entry
+4-5 times in a row. Rows are grouped by (accent-folded, case-folded
+spelling, exact definitions text) before writing entries -- merging across
+case is normally unsafe (see greek_normalize.py), but is fine here because
+the merge key requires the full definitions text to match exactly, which
+rules out conflating a real proper-noun/common-noun pair (those would have
+different definitions rows to begin with). Morphology is unioned across
+every spelling variant in a group, since Morpheus is keyed by exact string
+and different variants can carry different attested inflected forms.
 """
 import sqlite3
 import html
@@ -12,6 +26,8 @@ import os
 import unicodedata
 import json
 from collections import defaultdict
+
+from greek_normalize import accent_key, pick_representative
 
 LSJ_DB_PATH = 'data/lsj.db'
 MORPH_DB_PATH = 'data/morph.db'
@@ -75,31 +91,64 @@ def build_dictionary():
 
         print("Fetching LSJ entries...")
         lsj_cursor.execute("SELECT id, lemma, lemma_normalized, definitions FROM definitions")
-        entries = lsj_cursor.fetchall()
+        rows = lsj_cursor.fetchall()
+        print(f"Found {len(rows)} raw rows. Grouping accent/case duplicates...")
+
+        groups = defaultdict(list)
+        for rid, lemma, lemma_norm, defs in rows:
+            groups[(accent_key(lemma).lower(), defs)].append((rid, lemma, lemma_norm))
+        entries = list(groups.items())
 
         total_entries = len(entries)
-        print(f"Found {total_entries} entries. Building structures...")
+        print(f"Merged into {total_entries} entries "
+              f"({len(rows) - total_entries} duplicate rows folded in). Building structures...")
 
-        for index, row in enumerate(entries):
-            entry_id = f"lsj_{row[0]}"
-            raw_lemma = row[1]
-            raw_lemma_norm = row[2]
-            raw_def_en = row[3]
+        def pick_representative_lemma(members):
+            """Prefer whichever spelling variant Morpheus (data/morph.db, an
+            independent source) actually has inflected forms recorded under
+            -- e.g. for the logos/logos/Logos/Logos group, only 'logos'
+            (paroxytone) has any morph.db rows (18 of them); the other 4
+            spellings have none. That's real evidence for which spelling is
+            the standard citation form, unlike an alphabetical tie-break
+            (which for this exact group would have picked the oxytone
+            'logos' misaccentuation just because its accented vowel sorts
+            earlier in Unicode). Falls back to accent/case-based selection
+            when no variant has any morph.db attestation."""
+            distinct = {m[1] for m in members}
+            if len(distinct) > 1:
+                counts = {}
+                for lemma in distinct:
+                    morph_cursor.execute("SELECT COUNT(*) FROM morphology WHERE lemma = ?", (lemma,))
+                    counts[lemma] = morph_cursor.fetchone()[0]
+                best_count = max(counts.values())
+                if best_count > 0:
+                    distinct = {l for l, c in counts.items() if c == best_count}
+            return pick_representative(distinct)
 
-            is_def_json, any_translated = is_by_id.get(row[0], (None, 0))
+        for index, ((_, raw_def_en), members) in enumerate(entries):
+            representative_lemma = pick_representative_lemma(members)
+            representative_id = next(rid for rid, lemma, _ in members if lemma == representative_lemma)
+            entry_id = f"lsj_{representative_id}"
 
-            safe_title = sanitize_apple_key(raw_lemma)
+            is_def_json, any_translated = is_by_id.get(representative_id, (None, 0))
+
+            safe_title = sanitize_apple_key(representative_lemma)
             if not safe_title:
                 safe_title = "unknown"
 
             xml.write(f'    <d:entry id="{entry_id}" d:title="{html.escape(safe_title)}">\n')
-            search_indices = {raw_lemma, raw_lemma_norm}
+            search_indices = set()
+            for _, lemma, lemma_norm in members:
+                search_indices.add(lemma)
+                search_indices.add(lemma_norm)
 
-            morph_cursor.execute("""
-                SELECT form, form_normalized, pos, tense, voice, mood, person, number, case_name, gender
-                FROM morphology WHERE lemma = ?
-            """, (raw_lemma,))
-            morph_rows = morph_cursor.fetchall()
+            morph_rows = []
+            for _, lemma, _ in members:
+                morph_cursor.execute("""
+                    SELECT form, form_normalized, pos, tense, voice, mood, person, number, case_name, gender
+                    FROM morphology WHERE lemma = ?
+                """, (lemma,))
+                morph_rows.extend(morph_cursor.fetchall())
 
             is_verb = False
             is_noun_adj = False
@@ -159,7 +208,7 @@ def build_dictionary():
 
             clean_definition_en = render_defs(raw_def_en)
 
-            xml.write(f'        <h1 class="entry-lemma">{html.escape(raw_lemma)}</h1>\n')
+            xml.write(f'        <h1 class="entry-lemma">{html.escape(representative_lemma)}</h1>\n')
             xml.write(f'        <div class="definition">\n')
             if any_translated and is_def_json:
                 clean_definition_is = render_defs(is_def_json)

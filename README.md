@@ -25,7 +25,8 @@
 
 Two `.dictionary` plugins for the native macOS Dictionary app and
 system-wide "Look Up" feature, built from the **LSJ Ancient Greek lexicon**
-(110,826 entries):
+(110,826 raw entries, merged down to 49,828 dictionary entries — see
+"Duplicate headwords" below):
 
 * **AncientGreekIcelandicDictionary** — Greek headword → Icelandic glossary
   (+ full English LSJ gloss for reference).
@@ -101,24 +102,49 @@ that looked like). This version trades coverage for not lying to you.
 meaning, not as a citable definition.** The English LSJ gloss alongside it
 is the authoritative source.
 
+### Duplicate headwords (accent/case variants of the same word)
+
+LSJ's TEI-XML parsing produced many rows in `data/lsj.db` that are pure
+duplicates of each other under a different accent placement or
+capitalization — e.g. "logos" showed up as five separate rows (λόγος,
+λογός, Λόγος, Λογός, Λογος) with byte-identical definitions text. That's
+not five homonyms, it's one headword counted five times, and it made "Look
+Up" show the same entry back-to-back repeatedly.
+
+`scripts/build_xml.py` now groups rows by (accent-folded spelling, exact
+definitions text) before writing entries — merging *across case* is
+normally unsafe (capitalization can be the only thing distinguishing a
+proper name from a common noun), but it's fine here specifically because
+the merge key also requires the full definitions text to match exactly; a
+genuine proper-noun/common-noun pair would have different definitions to
+begin with and wouldn't merge. Morphology is unioned across every spelling
+variant in a merged group, and the displayed headword is chosen by
+checking which variant Morpheus (`data/morph.db`, an independent source)
+actually has inflected forms recorded under — for the logos group, only
+the correctly-accented "λόγος" had any (18 forms; the other four had zero),
+which is a much better signal than an arbitrary alphabetical tie-break.
+This merge alone cut 110,826 raw rows down to 49,828 actual entries.
+
 ### The reverse direction (Icelandic → Greek) is coarser still
 
 `scripts/build_reverse_xml.py` inverts the forward glossary: every
 single-word Icelandic gloss becomes a headword pointing back to the Greek
 word(s) that produced it (multi-word glosses aren't invertible onto one
 headword, so only single words are indexed). Two things fall out of this:
-- LSJ carries many pure accent-placement variants of what is unambiguously
-  the same Greek word as separate headwords (e.g. "hippos" with an acute,
-  a grave, a circumflex, or no accent mark at all, purely as a source-text
-  artifact). `_dedup_greek_forms()` collapses these — but deliberately
-  *only* accent placement, never breathing marks or capitalization, since
-  both of those are genuinely meaningful in Greek (rough vs smooth
-  breathing distinguishes real word pairs like "hóros"/boundary vs
-  "óros"/mountain; capitalization distinguishes a proper name like Hippos
-  from the common noun "hippos"/horse). So a lookup like "hestur" now
-  returns a shorter but still non-trivial cluster (ἵππος, ἴππος, ἱππικός,
-  ἱππότης, Ἱππότης, Ἰππός, κόττος, ...) rather than one clean entry — the
-  remaining spread is genuine distinct words/forms, not orthographic noise.
+- Unlike the forward direction, entries here aren't grouped by matching
+  definitions text (there isn't one definitions text per Icelandic
+  headword to compare), so the safe cross-case merge above doesn't apply.
+  `greek_normalize.dedup_accent_variants()` still folds pure accent-only
+  duplicates (e.g. "hippos" with an acute, a grave, a circumflex, or no
+  accent mark at all), but deliberately leaves breathing marks and
+  capitalization alone, since both are genuinely meaningful in Greek
+  (rough vs smooth breathing distinguishes real word pairs like
+  "hóros"/boundary vs "óros"/mountain; capitalization distinguishes a
+  proper name like Hippos from the common noun "hippos"/horse). So a
+  lookup like "hestur" still returns a non-trivial cluster (ἵππος,
+  ἱππικός, ἱππότης, Ἱππότης, Ἰππός, κόττος, ...) rather than one clean
+  entry — the remaining spread is genuine distinct words/forms, not
+  orthographic noise.
 - No morphology tables in this direction — the headword is Icelandic, not
   Greek, so Morpheus declension data doesn't apply (same scope decision as
   `icelandic-nordic-dictionary-mac`'s reverse bundles).

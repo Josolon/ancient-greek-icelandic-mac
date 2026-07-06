@@ -13,7 +13,8 @@ Coarser than the forward direction by construction:
      unambiguously the same Greek word as distinct headwords (e.g. hippos
      appearing with an acute, a grave, a circumflex, or no accent mark at
      all, purely as an artifact of the source text/edition). These are
-     deduplicated below via _accent_key(), which strips only the
+     deduplicated below via greek_normalize.dedup_accent_variants(), which
+     strips only the
      acute/grave/circumflex combining marks -- NOT breathing marks or
      capitalization, both of which are meaningful in Greek (rough vs smooth
      breathing distinguishes real word pairs like hóros "boundary" vs
@@ -33,40 +34,10 @@ import sqlite3
 import unicodedata
 from collections import defaultdict
 
+from greek_normalize import dedup_accent_variants
+
 IS_DB_PATH = "data/lsj_is.db"
 OUTPUT_XML_PATH = "src/IcelandicGreekDictionary.xml"
-
-# Combining accent marks (acute, grave, circumflex/perispomeni) to strip for
-# dedup purposes. Deliberately excludes breathing marks (U+0313 smooth,
-# U+0314 rough) and iota subscript (U+0345), which are never purely
-# cosmetic in Greek.
-_ACCENT_MARKS = {"́", "̀", "͂"}
-
-
-def _accent_key(word):
-    """Grouping key that folds away pure accent-placement variants while
-    preserving breathing marks and case (both can be semantically real)."""
-    decomposed = unicodedata.normalize("NFD", word)
-    return "".join(ch for ch in decomposed if ch not in _ACCENT_MARKS)
-
-
-def _dedup_greek_forms(lemmas):
-    """Collapse accent-only spelling variants in `lemmas` to one
-    representative each, preferring the fullest/most-accented spelling
-    (more combining marks = more standard/complete accentuation), with a
-    deterministic alphabetical tie-break."""
-    groups = defaultdict(list)
-    for lemma in lemmas:
-        groups[_accent_key(lemma)].append(lemma)
-
-    def mark_count(s):
-        return len(unicodedata.normalize("NFD", s)) - len(s)
-
-    representatives = []
-    for variants in groups.values():
-        best = sorted(variants, key=lambda s: (-mark_count(s), s))[0]
-        representatives.append(best)
-    return representatives
 
 
 def sanitize_apple_key(text):
@@ -119,7 +90,7 @@ def build_reverse_index():
             xml.write(f'    <d:entry id="{entry_id}" d:title="{html.escape(safe_title)}">\n')
             xml.write(f'        <d:index d:value="{html.escape(safe_title)}"/>\n')
 
-            deduped = _dedup_greek_forms(greek_lemmas)
+            deduped = dedup_accent_variants(greek_lemmas)
 
             xml.write(f'        <h1 class="entry-lemma">{html.escape(is_word)}</h1>\n')
             xml.write('        <div class="definition">\n')
