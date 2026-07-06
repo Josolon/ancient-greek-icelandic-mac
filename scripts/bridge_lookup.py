@@ -16,7 +16,10 @@ Junk signatures observed in the glossary and filtered here:
   - "channel" -> "Stöð", "word" -> "Word": proper-noun/product-name rows
     (Wikipedia titles) outranking the real word. Fixed by penalizing
     capitalized candidates and EN-POS "Proper noun" rows for lowercase
-    English words.
+    English words, and by merging case variants of the same Icelandic word
+    ("Stöð"/"stöð") into one pooled-evidence candidate in the first place --
+    they aren't two competing translations, they're the same word counted
+    twice under different capitalization.
   - "it" -> "upplýsingatækni": acronym expansions. Handled by _OVERRIDES.
   - "shade" -> "hansagardína" (a curtain brand, score 1.0 on 3 hits) beating
     "skuggi" (score 0.14 but 22 hits): a single high score with almost no
@@ -60,7 +63,7 @@ _PLURAL_IRREGULAR = {
     "calves": "calf", "hooves": "hoof", "thieves": "thief", "sheaves": "sheaf",
 }
 
-_table = None  # english lowercase -> {icelandic: {"score","evidence","en_pos","is_pos"}}
+_table = None  # english lowercase -> {icelandic_lower: {"score","evidence","en_pos","is_pos","surface","_casing"}}
 
 
 def _load():
@@ -87,20 +90,37 @@ def _load():
             is_pos, en_pos = row[2].strip(), row[3].strip()
 
             bucket = _table.setdefault(english.lower(), {})
-            cand = bucket.get(icelandic)
+            # Dedup key is case-insensitive: "Stöð" and "stöð" for "channel"
+            # are the same word, not two different candidates that happen
+            # to compete for the top slot -- pool their evidence instead of
+            # letting a capitalized Wikipedia-title row silently outrank the
+            # ordinary word it's actually the same as.
+            dedup_key = icelandic.lower()
+            cand = bucket.get(dedup_key)
             if cand is None:
-                bucket[icelandic] = {
+                bucket[dedup_key] = {
                     "score": score, "evidence": evidence,
                     "en_pos": en_pos, "is_pos": is_pos,
+                    "surface": icelandic, "_casing": {icelandic: evidence},
                 }
             else:
-                # Duplicate (en, is) rows exist with different POS tagging;
-                # merge: sum evidence, keep max score and the more informative POS.
+                # Duplicate rows exist with different POS tagging and/or
+                # casing; merge: sum evidence, keep max score, the more
+                # informative POS, and recompute which casing to surface.
                 cand["score"] = max(cand["score"], score)
                 cand["evidence"] += evidence
+                cand["_casing"][icelandic] = cand["_casing"].get(icelandic, 0) + evidence
                 for key, val in (("en_pos", en_pos), ("is_pos", is_pos)):
                     if cand[key] in ("NULL", "", "Proper noun") and val not in ("NULL", ""):
                         cand[key] = val
+                # Prefer whichever casing has more evidence behind it; break
+                # ties toward lowercase (capitalization in this glossary is
+                # far more often a citation/title artifact than a genuine
+                # proper noun).
+                cand["surface"] = max(
+                    cand["_casing"].items(),
+                    key=lambda kv: (kv[1], kv[0].islower()),
+                )[0]
     return _table
 
 
@@ -137,15 +157,18 @@ MIN_EVIDENCE = 5
 
 def _ranked(en_word, cands, en_pos_hint=None, min_evidence=MIN_EVIDENCE):
     """Rank a candidate dict by adjusted quality, best first. Candidates
-    below min_evidence are dropped outright, not just down-weighted."""
+    below min_evidence are dropped outright, not just down-weighted.
+    Returns (surface_form, candidate_dict) pairs -- `cands` is keyed by the
+    case-insensitive dedup key, not the display spelling; the display
+    spelling lives in candidate_dict["surface"]."""
     en_lower_word = en_word[0].islower() if en_word else True
-    qualified = {ic: c for ic, c in cands.items() if c["evidence"] >= min_evidence}
+    qualified = [c for c in cands.values() if c["evidence"] >= min_evidence]
     if not qualified:
         return []
-    has_lowercase = any(ic[0].islower() for ic in qualified)
+    has_lowercase = any(c["surface"][0].islower() for c in qualified)
 
-    def quality(item):
-        icelandic, c = item
+    def quality(c):
+        icelandic = c["surface"]
         q = c["score"]
         if en_lower_word and icelandic[0].isupper() and has_lowercase:
             q *= 0.15
@@ -160,7 +183,7 @@ def _ranked(en_word, cands, en_pos_hint=None, min_evidence=MIN_EVIDENCE):
                 q *= 0.7
         return q
 
-    return sorted(qualified.items(), key=quality, reverse=True)
+    return [(c["surface"], c) for c in sorted(qualified, key=quality, reverse=True)]
 
 
 def _candidates_for(word):
