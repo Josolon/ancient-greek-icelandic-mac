@@ -3,18 +3,25 @@ Ancient Greek word(s). Inverts data/lsj_is.db's forward glossary (Greek ->
 Icelandic), the same way icelandic-nordic-dictionary-mac inverts ISLEX for
 its x2is bundles.
 
-Coarser than the forward direction by construction, for two reasons that
-are inherent to inverting a gloss-substitution bridge rather than a bug:
+Coarser than the forward direction by construction:
   1. Only single-word Icelandic glosses become reverse headwords -- a
      multi-word phrase like "konungur, yfirmaður" as a sense doesn't have
      one natural "headword" to invert on, so each comma-split single word
      is indexed separately (both "konungur" and "yfirmaður" point back to
      the Greek word that produced that sense).
-  2. LSJ carries many diacritic/dialect spelling variants of what is
-     linguistically "the same" Greek word as distinct headwords (e.g.
-     several accentuation variants of hippos), all of which end up under
-     the same Icelandic entry. This is a real property of the LSJ dataset,
-     not something to silently collapse here.
+  2. LSJ carries many pure ACCENT-placement variants of what is
+     unambiguously the same Greek word as distinct headwords (e.g. hippos
+     appearing with an acute, a grave, a circumflex, or no accent mark at
+     all, purely as an artifact of the source text/edition). These are
+     deduplicated below via _accent_key(), which strips only the
+     acute/grave/circumflex combining marks -- NOT breathing marks or
+     capitalization, both of which are meaningful in Greek (rough vs smooth
+     breathing distinguishes real word pairs like hóros "boundary" vs
+     óros "mountain"; capitalization distinguishes a proper name like
+     Hippos from the common noun hippos "horse"). So "case/accent
+     differences with no meaningful difference" are collapsed, but
+     anything that could actually change the word is deliberately left
+     alone, at the cost of leaving some genuine near-duplicates unmerged.
 No morphology tables in this direction -- the headword is Icelandic, not
 Greek, so Morpheus declension/principal-part data doesn't apply (same
 scope decision as icelandic-nordic-dictionary-mac's x2is bundles).
@@ -28,6 +35,38 @@ from collections import defaultdict
 
 IS_DB_PATH = "data/lsj_is.db"
 OUTPUT_XML_PATH = "src/IcelandicGreekDictionary.xml"
+
+# Combining accent marks (acute, grave, circumflex/perispomeni) to strip for
+# dedup purposes. Deliberately excludes breathing marks (U+0313 smooth,
+# U+0314 rough) and iota subscript (U+0345), which are never purely
+# cosmetic in Greek.
+_ACCENT_MARKS = {"́", "̀", "͂"}
+
+
+def _accent_key(word):
+    """Grouping key that folds away pure accent-placement variants while
+    preserving breathing marks and case (both can be semantically real)."""
+    decomposed = unicodedata.normalize("NFD", word)
+    return "".join(ch for ch in decomposed if ch not in _ACCENT_MARKS)
+
+
+def _dedup_greek_forms(lemmas):
+    """Collapse accent-only spelling variants in `lemmas` to one
+    representative each, preferring the fullest/most-accented spelling
+    (more combining marks = more standard/complete accentuation), with a
+    deterministic alphabetical tie-break."""
+    groups = defaultdict(list)
+    for lemma in lemmas:
+        groups[_accent_key(lemma)].append(lemma)
+
+    def mark_count(s):
+        return len(unicodedata.normalize("NFD", s)) - len(s)
+
+    representatives = []
+    for variants in groups.values():
+        best = sorted(variants, key=lambda s: (-mark_count(s), s))[0]
+        representatives.append(best)
+    return representatives
 
 
 def sanitize_apple_key(text):
@@ -80,11 +119,13 @@ def build_reverse_index():
             xml.write(f'    <d:entry id="{entry_id}" d:title="{html.escape(safe_title)}">\n')
             xml.write(f'        <d:index d:value="{html.escape(safe_title)}"/>\n')
 
+            deduped = _dedup_greek_forms(greek_lemmas)
+
             xml.write(f'        <h1 class="entry-lemma">{html.escape(is_word)}</h1>\n')
             xml.write('        <div class="definition">\n')
             xml.write('            <p class="gloss-en"><i>Forngrísk orð / Ancient Greek words:</i></p>\n')
             xml.write('            <p class="gloss-is">')
-            xml.write(", ".join(f'<b class="gk-word">{html.escape(gk)}</b>' for gk in sorted(greek_lemmas)))
+            xml.write(", ".join(f'<b class="gk-word">{html.escape(gk)}</b>' for gk in sorted(deduped)))
             xml.write('</p>\n')
             xml.write('        </div>\n')
             xml.write('    </d:entry>\n\n')

@@ -14,9 +14,11 @@
 >   sense** of a polysemous headword (the two independent resources this
 >   bridges don't share any notion of "the same sense") — always cross-check
 >   against the English LSJ gloss shown alongside it.
-> - The reverse (Icelandic → Greek) direction is coarser still, and LSJ's
->   own spelling/dialect variants of "the same" Greek word show up as
->   separate results rather than being collapsed.
+> - The reverse (Icelandic → Greek) direction is coarser still. Pure
+>   accent-placement duplicates of the same Greek word are collapsed, but
+>   breathing-mark and capitalization differences are kept apart on purpose
+>   (both can be genuinely meaningful in Greek), so some near-duplicate
+>   results remain.
 >
 > Contributions on translation quality, phrase segmentation, and citation
 > filtering are very welcome — see Contributing below.
@@ -104,12 +106,19 @@ is the authoritative source.
 `scripts/build_reverse_xml.py` inverts the forward glossary: every
 single-word Icelandic gloss becomes a headword pointing back to the Greek
 word(s) that produced it (multi-word glosses aren't invertible onto one
-headword, so only single words are indexed). Two things fall out of this
-that are inherent to the data, not bugs:
-- LSJ carries many diacritic/dialect spelling variants of what is
-  linguistically "the same" Greek word as separate headwords, so a lookup
-  like "hestur" returns a cluster of near-duplicate forms (ἵππος, ἱππος,
-  Ἵππος, ...) rather than one clean entry.
+headword, so only single words are indexed). Two things fall out of this:
+- LSJ carries many pure accent-placement variants of what is unambiguously
+  the same Greek word as separate headwords (e.g. "hippos" with an acute,
+  a grave, a circumflex, or no accent mark at all, purely as a source-text
+  artifact). `_dedup_greek_forms()` collapses these — but deliberately
+  *only* accent placement, never breathing marks or capitalization, since
+  both of those are genuinely meaningful in Greek (rough vs smooth
+  breathing distinguishes real word pairs like "hóros"/boundary vs
+  "óros"/mountain; capitalization distinguishes a proper name like Hippos
+  from the common noun "hippos"/horse). So a lookup like "hestur" now
+  returns a shorter but still non-trivial cluster (ἵππος, ἴππος, ἱππικός,
+  ἱππότης, Ἱππότης, Ἰππός, κόττος, ...) rather than one clean entry — the
+  remaining spread is genuine distinct words/forms, not orthographic noise.
 - No morphology tables in this direction — the headword is Icelandic, not
   Greek, so Morpheus declension data doesn't apply (same scope decision as
   `icelandic-nordic-dictionary-mac`'s reverse bundles).
