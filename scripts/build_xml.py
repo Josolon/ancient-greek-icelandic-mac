@@ -35,24 +35,50 @@ IS_DB_PATH = 'data/lsj_is.db'
 OUTPUT_XML_PATH = 'src/GreekIcelandicDictionary.xml'
 
 PRINCIPAL_PARTS_ORDER = [
-    'Present Active', 'Present Middle', 'Present Passive',
-    'Future Active',  'Future Middle',
-    'Aorist Active',  'Aorist Middle',
-    'Perfect Active',
-    'Perfect Middle', 'Perfect Passive',
-    'Aorist Passive',
+    ('present', 'active'), ('present', 'middle'), ('present', 'passive'),
+    ('future', 'active'),  ('future', 'middle'),
+    ('aorist', 'active'),  ('aorist', 'middle'),
+    ('perfect', 'active'),
+    ('perfect', 'middle'), ('perfect', 'passive'),
+    ('aorist', 'passive'),
 ]
 PRINCIPAL_PARTS_PRIMARY = frozenset(PRINCIPAL_PARTS_ORDER)
 
-# Standard Icelandic grammatical terms for case/number -- these are
-# everyday Icelandic (taught in school), unlike aspect/voice terminology
-# for Ancient Greek verbs, which has no settled Icelandic classicist
-# convention; verb principal-part labels are therefore left in English.
+# Standard Icelandic grammatical terms, as supplied by the user (an
+# Icelandic classicist) for tense/voice/mood, plus everyday Icelandic
+# school terms for case/number/gender/part-of-speech.
 CASE_LABELS_IS = {
     'nominative': 'Nefnifall', 'genitive': 'Eignarfall',
     'dative': 'Þágufall', 'accusative': 'Þolfall', 'vocative': 'Ávarpsfall',
 }
 NUMBER_LABELS_IS = {'singular': 'Eintala', 'dual': 'Tvítala', 'plural': 'Fleirtala'}
+GENDER_LABELS_IS = {'masculine': 'Karlkyn', 'feminine': 'Kvenkyn', 'neuter': 'Hvorugkyn'}
+TENSE_LABELS_IS = {
+    'present': 'Nútíð', 'future': 'Framtíð', 'aorist': 'Þátíð',
+    'perfect': 'Núliðin tíð', 'imperfect': 'Dvalarþátíð',
+    'pluperfect': 'Þáliðin tíð', 'future perfect': 'Þáframtíð',
+}
+VOICE_LABELS_IS = {
+    'active': 'Germynd', 'middle': 'Miðmynd', 'passive': 'Þolmynd',
+    'middle/passive': 'Miðmynd/þolmynd',
+}
+MOOD_LABELS_IS = {
+    'indicative': 'Framsöguháttur', 'subjunctive': 'Viðtengingarháttur',
+    'optative': 'Óskháttur', 'imperative': 'Boðháttur',
+    'infinitive': 'Nafnháttur', 'participle': 'Lýsingarháttur',
+}
+PERSON_LABELS_IS = {'1st': '1. persóna', '2nd': '2. persóna', '3rd': '3. persóna'}
+POS_LABELS_IS = {
+    'noun': 'Nafnorð', 'verb': 'Sagnorð', 'participle': 'Lýsingarháttur',
+    'adv': 'Atviksorð', 'particle': 'Smáorð', 'conj': 'Samtenging',
+    'prep': 'Forsetning', 'numeral': 'Töluorð',
+}
+
+
+def _tense_voice_label(tense, voice):
+    t = TENSE_LABELS_IS.get(str(tense).lower(), str(tense).capitalize())
+    v = VOICE_LABELS_IS.get(str(voice).lower(), str(voice).capitalize())
+    return f"{t} – {v}"
 
 
 def sanitize_apple_key(text):
@@ -166,6 +192,7 @@ def build_dictionary():
                 person = mr[6]
                 number = mr[7]
                 case_name = mr[8]
+                gender = mr[9]
 
                 search_indices.add(raw_form)
                 search_indices.add(raw_form_norm)
@@ -175,8 +202,8 @@ def build_dictionary():
                 if pos == 'verb':
                     is_verb = True
                     if person == '1st' and number == 'singular' and mood == 'indicative':
-                        label = f"{str(tense).capitalize()} {str(voice).capitalize()}".strip()
-                        verb_principal_parts[label].add(display_form)
+                        key = (str(tense).lower(), str(voice).lower())
+                        verb_principal_parts[key].add(display_form)
 
                 elif pos in ('noun', 'adjective', 'article', 'pronoun'):
                     is_noun_adj = True
@@ -184,7 +211,23 @@ def build_dictionary():
                         noun_grid[case_name][number].add(display_form)
 
                 else:
-                    parsing_elements = [str(item) for item in mr[2:] if item]
+                    parsing_elements = []
+                    if pos:
+                        parsing_elements.append(POS_LABELS_IS.get(str(pos).lower(), str(pos).capitalize()))
+                    if tense:
+                        parsing_elements.append(TENSE_LABELS_IS.get(str(tense).lower(), str(tense).capitalize()))
+                    if voice:
+                        parsing_elements.append(VOICE_LABELS_IS.get(str(voice).lower(), str(voice).capitalize()))
+                    if mood:
+                        parsing_elements.append(MOOD_LABELS_IS.get(str(mood).lower(), str(mood).capitalize()))
+                    if person:
+                        parsing_elements.append(PERSON_LABELS_IS.get(person, str(person)))
+                    if number:
+                        parsing_elements.append(NUMBER_LABELS_IS.get(number, str(number).capitalize()))
+                    if case_name:
+                        parsing_elements.append(CASE_LABELS_IS.get(case_name, str(case_name).capitalize()))
+                    if gender:
+                        parsing_elements.append(GENDER_LABELS_IS.get(str(gender).lower(), str(gender).capitalize()))
                     parsing_str = " ".join(parsing_elements)
                     if parsing_str and parsing_str not in generic_forms[display_form]:
                         generic_forms[display_form].append(parsing_str)
@@ -241,14 +284,16 @@ def build_dictionary():
                 xml.write('        <div class="morph-section">\n')
                 xml.write('            <p class="morph-label">Sagnmyndir / Principal Parts</p>\n')
                 xml.write('            <table class="morphology-table">\n')
-                xml.write('                <tr><th>Tíð &amp; Mynd</th><th>Mynd (1. p. et. framsöguh.)</th></tr>\n')
+                xml.write('                <tr><th>Tíð &amp; mynd</th><th>Mynd (1. p. et., framsöguháttur)</th></tr>\n')
 
-                for label in PRINCIPAL_PARTS_ORDER:
-                    if label in primary_parts:
-                        xml.write(f'                <tr><td class="case-label">{label}</td><td>{", ".join(primary_parts[label])}</td></tr>\n')
+                for key in PRINCIPAL_PARTS_ORDER:
+                    if key in primary_parts:
+                        label = _tense_voice_label(*key)
+                        xml.write(f'                <tr><td class="case-label">{label}</td><td>{", ".join(primary_parts[key])}</td></tr>\n')
                 if secondary_parts:
-                    xml.write('                <tr class="morph-secondary-header"><td colspan="2">Additional attested forms</td></tr>\n')
-                    for label, forms in sorted(secondary_parts.items()):
+                    xml.write('                <tr class="morph-secondary-header"><td colspan="2">Aðrar mögulegar myndir / Additional attested forms</td></tr>\n')
+                    for key, forms in sorted(secondary_parts.items(), key=lambda kv: _tense_voice_label(*kv[0])):
+                        label = _tense_voice_label(*key)
                         xml.write(f'                <tr><td class="case-label">{label}</td><td>{", ".join(forms)}</td></tr>\n')
 
                 xml.write('            </table>\n')

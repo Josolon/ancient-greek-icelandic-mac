@@ -156,11 +156,12 @@ headword, so only single words are indexed). Two things fall out of this:
 * **System Integration:** works natively with macOS "Look Up".
 * **Morphology tables** (forward direction only): noun declensions and verb
   principal parts, reused directly from `ancient-greek-mac`'s Morpheus data.
-  Case/number labels are shown in Icelandic (Nefnifall, Eignarfall,
-  Þágufall, Þolfall, Ávarpsfall / Eintala, Tvítala, Fleirtala) since these
-  are standard school-taught terms; verb tense/voice labels are left in
-  English pending a settled Icelandic classicist convention — see
-  Contributing.
+  Every label is in Icelandic: case/number for nouns (Nefnifall,
+  Eignarfall, Þágufall, Þolfall, Ávarpsfall / Eintala, Tvítala, Fleirtala),
+  and tense/voice/mood for verbs (Nútíð, Framtíð, Þátíð, Núliðin tíð,
+  Dvalarþátíð, Þáliðin tíð, Þáframtíð / Germynd, Miðmynd, Þolmynd /
+  Framsöguháttur, Viðtengingarháttur, Óskháttur, Boðháttur, Nafnháttur,
+  Lýsingarháttur), supplied by a native Icelandic classicist.
 * **Transparency:** the full English LSJ gloss is always shown alongside
   the Icelandic glossary, so nothing is silently hidden behind a
   translation guess.
@@ -231,10 +232,6 @@ ancient-greek-icelandic-mac/
   acronym outliers and self-referential candidates — extending that (better
   phrase segmentation, real POS tagging of LSJ senses instead of a POS-less
   guess) directly improves coverage and precision.
-* **Icelandic classical-grammar terminology:** if you know the standard
-  Icelandic terms for Greek verb tense/voice/mood (as taught in Icelandic
-  classics courses, if such a convention exists), replacing the English
-  labels in `scripts/build_xml.py` would be valuable.
 * **Weird/broken entries:** same caveat as `ancient-greek-mac` — 110k
   auto-generated entries will have edge cases.
 
