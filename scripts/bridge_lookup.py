@@ -131,6 +131,20 @@ _PLURAL_IRREGULAR = {
     "calves": "calf", "hooves": "hoof", "thieves": "thief", "sheaves": "sheaf",
 }
 
+# (english_lower, icelandic_lower) pairs to drop outright from the
+# Wiktionary supplement -- a real dictionary sense, but one so narrow it
+# does more harm than good as a default translation in a classical
+# lexicon. "rödd" (score 0.22, evidence 8) means "part" only in the
+# choral/musical sense ("fjögurra radda kór", a four-part choir), a sense
+# that essentially never occurs in an LSJ shortdef -- yet without this
+# exclusion it outranks well-attested "hluti" (0.116, 40 hits) for bare
+# "part", and leaks (via lemmatization) into "parted"/"parts" too. Caught
+# via moira ("a part, portion; fate") glossing as "rödd, skammtur, örlög",
+# wrongly including the voice/singing word instead of "hluti".
+_WIKTIONARY_EXCLUDE_PAIRS = {
+    ("part", "rödd"),
+}
+
 _table = None  # english lowercase -> {icelandic_lower: {"score","evidence","en_pos","is_pos","surface","_casing"}}
 
 
@@ -196,6 +210,8 @@ def _load():
                 if len(row) != 3:
                     continue
                 english, icelandic, en_pos = row
+                if (english.lower(), icelandic.lower()) in _WIKTIONARY_EXCLUDE_PAIRS:
+                    continue
                 bucket = _table.setdefault(english, {})
                 cand = bucket.get(icelandic.lower())
                 if cand is not None:
