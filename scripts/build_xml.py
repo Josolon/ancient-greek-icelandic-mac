@@ -767,56 +767,54 @@ def sanitize_apple_key(text):
 # length, unaspirated/aspirated stop pairs, and a rolled r that English
 # lacks, so it's a far more precise anchor for a reconstructed classical
 # pronunciation than English examples are. Verbatim from the user's own
-# table (data/greek_pronunciation.rtf-derived) -- the classical-value
-# column is deliberately left in the user's own wording (mostly English,
-# matching the source textbook's terms) rather than translated, and the
-# Icelandic-anchor column is exactly as the user wrote it, including
-# spelling, since it records a specific personal pronunciation judgment
-# that isn't ours to rephrase or "correct".
+# table (data/greek_pronunciation.rtf-derived) -- the Icelandic-anchor
+# column is exactly as the user wrote it, including spelling, since it
+# records a specific personal pronunciation judgment that isn't ours to
+# rephrase or "correct".
 _PRONUNCIATION_VOWELS = [
-    ("ᾰ (short a)", "as Ital. amare 1st a", "a í aska (stutt)"),
-    ("ᾱ (long a)", "as Ital. amare 2nd a", "a í aka (langt)"),
-    ("ᾳ (long a + iota)", "as ā", "a-æ í ha-æ (þykt hæ; ha yfir í hæ)"),
-    ("αι", "as Eng. high", "æ í bækur"),
-    ("αυ", "as Eng. how", "á í hár"),
-    ("āυ", "as αυ, lengthened", "a-á í ha-á (ha yfir í há)"),
-    ("ει", "as Ger. Beet, Weg", "e í þ. Weg, ekki vegur (lokað)"),
-    ("ευ", "as We-ug (Ger. Weg into ug)", "e-ú / \"We-ug\" (Weg yfir í úg)"),
-    ("η (long e)", "as Fr. tête", "lesa, vegur (opið)"),
-    ("ῃ", "as η + iota", "le-eysa (lesa yfir í leysa)"),
-    ("ηυ", "as η + υ", "le-úsa (lesa yfir í lúsa)"),
-    ("ῐ (short i)", "as Fr. vite", "í í ískra"),
-    ("ῑ (long i)", "as Fr. vive", "ý í nýta"),
-    ("ο (short o)", "as Ger. Gott", "ekki o í ostur heldur enskt eða þýskt o"),
-    ("οι", "as French feuille (or as Eng. boy)", "au í haust (eða og í bogi)"),
-    ("ου", "as Eng. pool", "ú í núna"),
-    ("υ (short)", "as Fr. lune", "u í undra"),
-    ("ῡ (long u)", "as Fr. ruse", "u í muna"),
-    ("υι", "see pp.80ff", "ug í hugi"),
-    ("ω (long o)", "as Eng. saw", "o í nota"),
-    ("ῳ", "as ω + iota (as Eng. boy) as owe", "og í bogi / ó í ól, ekki sólir (langt)"),
+    ("ᾰ (short a)", "a í aska (stutt)"),
+    ("ᾱ (long a)", "a í aka (langt)"),
+    ("ᾳ (long a + iota)", "a-æ í ha-æ (þykt hæ; ha yfir í hæ)"),
+    ("αι", "æ í bækur"),
+    ("αυ", "á í hár"),
+    ("āυ", "a-á í ha-á (ha yfir í há)"),
+    ("ει", "e í þ. Weg, ekki vegur (lokað)"),
+    ("ευ", "e-ú / \"We-ug\" (Weg yfir í úg)"),
+    ("η (long e)", "lesa, vegur (opið)"),
+    ("ῃ", "le-eysa (lesa yfir í leysa)"),
+    ("ηυ", "le-úsa (lesa yfir í lúsa)"),
+    ("ῐ (short i)", "í í ískra"),
+    ("ῑ (long i)", "ý í nýta"),
+    ("ο (short o)", "ekki o í ostur heldur enskt eða þýskt o"),
+    ("οι", "au í haust (eða og í bogi)"),
+    ("ου", "ú í núna"),
+    ("υ (short)", "u í undra"),
+    ("ῡ (long u)", "u í muna"),
+    ("υι", "ug í hugi"),
+    ("ω (long o)", "o í nota"),
+    ("ῳ", "og í bogi / ó í ól, ekki sólir (langt)"),
 ]
 _PRONUNCIATION_CONSONANTS = [
-    ("β", "Eng. b (…modern: Fr. bon)", "b í Big bad wolf (raddað)"),
-    ("γ", "hard g (…modern: Fr. garçon)", "g í good garçon (raddað)"),
-    ("γ before κ,χ,γ,μ", "ŋ (ink/song)", "n í langur"),
-    ("δ", "Fr. d (…modern Eng. d)", "d í deux"),
-    ("ζ", "[zd] as in wisdom", "st í staður (nema raddað zz)"),
-    ("θ", "t (emphatic)/th", "t í tala"),
-    ("κ", "kit", "g í gæti"),
-    ("λ", "Fr. l / Eng. l before vowels", "l í sæla"),
-    ("μ", "Eng. m", "m í mæla"),
-    ("ν", "n (Fr./Eng. net)", "n í næla"),
-    ("ξ", "ks", "x í lax"),
-    ("π", "pen", "b í bera"),
-    ("ρ", "Scottish rolled r", "r í hringur (when aspirated or doubled)/ r í sori (when unaspirated)"),
-    ("σ/ς before β,γ,δ,μ", "s / Z", "s í sofa\nz í Eng. zone"),
-    ("ττ / σσ", "as ττ", "dd í saddur\nss í hissa"),
-    ("φ", "p (emphatic)", "p í pera"),
-    ("χ", "k (emphatic)/Scot. loch", "k í kæti"),
-    ("ψ", "ps", "taps (ef.)"),
-    ("γγ", "=ŋg", "n í langur"),
-    ("ρρ", "= rhr", "rg í margt; rhr í vorhringur"),
+    ("β", "b í Big bad wolf (raddað)"),
+    ("γ", "g í good garçon (raddað)"),
+    ("γ before κ,χ,γ,μ", "n í langur"),
+    ("δ", "d í deux"),
+    ("ζ", "st í staður (nema raddað zz)"),
+    ("θ", "t í tala"),
+    ("κ", "g í gæti"),
+    ("λ", "l í sæla"),
+    ("μ", "m í mæla"),
+    ("ν", "n í næla"),
+    ("ξ", "x í lax"),
+    ("π", "b í bera"),
+    ("ρ", "r í hringur (when aspirated or doubled)/ r í sori (when unaspirated)"),
+    ("σ/ς before β,γ,δ,μ", "s í sofa\nz í Eng. zone"),
+    ("ττ / σσ", "dd í saddur\nss í hissa"),
+    ("φ", "p í pera"),
+    ("χ", "k í kæti"),
+    ("ψ", "taps (ef.)"),
+    ("γγ", "n í langur"),
+    ("ρρ", "rg í margt; rhr í vorhringur"),
 ]
 
 
@@ -844,12 +842,10 @@ def write_pronunciation_guide_entry(xml):
         xml.write('            <div class="morph-section">\n')
         xml.write(f'                <p class="morph-label">{html.escape(heading)}</p>\n')
         xml.write('                <table class="morphology-table">\n')
-        xml.write('                    <tr><th>Tákn</th><th>Klassískt gildi</th>'
-                   '<th>Íslenskt akkeri</th></tr>\n')
-        for symbol, value, anchor in rows:
+        xml.write('                    <tr><th>Tákn</th><th>Íslenskt akkeri</th></tr>\n')
+        for symbol, anchor in rows:
             xml.write(
                 f'                    <tr><td class="case-label">{html.escape(symbol, quote=False)}</td>'
-                f'<td>{html.escape(value, quote=False)}</td>'
                 f'<td>{html.escape(anchor, quote=False)}</td></tr>\n')
         xml.write('                </table>\n')
         xml.write('            </div>\n')
