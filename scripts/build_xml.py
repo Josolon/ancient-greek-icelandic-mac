@@ -775,34 +775,36 @@ def sanitize_apple_key(text):
 _PRONUNCIATION_VOWELS = [
     ("ᾰ", "/a/", "a í aska (stutt)"),
     ("ᾱ", "/aː/", "a í aka (langt)"),
-    ("ᾳ", "/aːi/", "a-æ í ha-æ (ýkt hæ; ha yfir í hæ)"),
+    ("ᾳ", "/aːi/", "a-æ í ha-æ (ýkt langt a)"),
     ("αι", "/ai/", "æ í bækur"),
     ("αυ", "/au/", "á í hár"),
-    ("āυ", "/aːu/", "a-á í ha-á (ha yfir í há)"),
-    ("ει", "/eː/", "e í þ. Weg, ekki vegur (lokað)"),
-    ("ευ", "/eu/", "e-ú / \"We-ug\" (Weg yfir í úg)"),
-    ("η", "/ɛː/", "lesa, vegur (opið)"),
-    ("ῃ", "/ɛːi/", "le-eysa (lesa yfir í leysa)"),
-    ("ηυ", "/ɛːu/", "le-úsa (lesa yfir í lúsa)"),
-    ("ῐ", "/i/", "í í ískra"),
-    ("ῑ", "/iː/", "ý í nýta"),
-    ("ο", "/o/", "ekki o í ostur heldur enskt eða þýskt o"),
-    ("οι", "/oi/", "au í haust (eða og í bogi)"),
+    ("āυ", "/aːu/", "a-á í ha-á (ýkt langt a)"),
+    ("ε", "/e/", "e í e. pet (lokað, stutt)"),
+    ("ει", "/eː/", "e í þ. Weg (lokað, langt)"),
+    ("ει á undan sérhljóða", "/ej/", "eyj í eyja."),
+    ("ευ", "/eu/", "e-ú / \"e-u\" (stutt lokað e yfir í ú)"),
+    ("η", "/ɛː/", "e í vegur (opið)"),
+    ("ῃ", "/ɛːi/", "e-ey í le-eysa (ýkt langt opið e)"),
+    ("ηυ", "/ɛːu/", "e-ú í \"le-úsa\" (langt opið e yfir í ú)"),
+    ("ῐ", "/i/", "í í ískra (stutt)"),
+    ("ῑ", "/iː/", "ý í nýta (langt)"),
+    ("ο", "/o/", "o í þ. Gott (lokað, stutt)"),
+    ("οι", "/oi/", "<i>au</i> í haust (eða <i>og</i> í bogi)"),
     ("ου", "/uː/", "ú í núna"),
     ("υ", "/y/", "u í undra"),
     ("ῡ", "/yː/", "u í muna"),
     ("υι", "/yi/", "ug í hugi"),
     ("ω", "/ɔː/", "o í nota"),
-    ("ῳ", "/ɔːi/", "og í bogi / ó í ól, ekki sólir (langt)"),
+    ("ῳ", "/ɔːi/", "og í bogi (ýkt langt opið o)"),
     ("ωυ", "/ɔːu/", "ó í ól (langt)"),
 ]
 _PRONUNCIATION_CONSONANTS = [
     ("β", "/b/", "b í e. bad"),
-    ("γ", "/ɡ/", "g í good garçon (raddað)"),
-    ("γ before κ,χ,γ,μ", "/ŋ/", "n í langur"),
-    ("δ", "/d/", "d í deux"),
+    ("γ", "/ɡ/", "g í fr. garçon (raddað)"),
+    ("γ á undan κ, χ, γ, μ", "/ŋ/", "n í langur"),
+    ("δ", "/d/", "d í fr. deux"),
     ("ζ", "/zd/", "st í staður (þó raddað: zd)"),
-    ("θ", "/tʰ/", "t í tala"),
+    ("θ", "/tʰ/", "t í töf"),
     ("κ", "/k/", "g í gæti"),
     ("λ", "/l/", "l í sæla"),
     ("μ", "/m/", "m í mæla"),
@@ -810,15 +812,16 @@ _PRONUNCIATION_CONSONANTS = [
     ("ξ", "/ks/", "x í lax"),
     ("π", "/p/", "b í bera"),
     ("ρ", "/r/", "r í vor"),
-    ("ῥ", "/r̥/", "r í hringur"),
+    ("ῥ", "/r̥/", "hr í hringur"),
     ("σ/ς", "/s/", "s í sofa"),
-    ("σ/ς before β, γ, δ, μ", "/z/", "z í e. zone"),
+    ("σ/ς á undan röddun (β, γ, δ, μ)", "/z/", "z í e. zone"),
+    ("τ", "/t/", "d í döf"),
     ("ττ", "/tː/", "dd í saddur"),
     ("σσ", "/sː/", "ss í hissa"),
     ("φ", "/pʰ/", "p í pera"),
     ("χ", "/kʰ/", "k í kæti"),
     ("ψ", "/ps/", "ps í taps(ins)"),
-    ("ρρ", "/rʰ/", "rg í margt; rhr í vorhringur"),
+    ("ρρ", "/r̥r/", "<i>rg</i> í margt; <i>rhr</i> í vorhringur"),
 ]
 
 # The Icelandic-anchor column follows a "LETTER í WORD" convention --
@@ -830,6 +833,11 @@ _LEADING_ANCHOR_RE = re.compile(r'^(\S+) í ')
 
 
 def _render_anchor_html(text):
+    # A row that demonstrates more than one anchor letter (e.g. "au í
+    # haust (eða og í bogi)") is pre-authored with its own <i> markup
+    # rather than run through the single-leading-token auto-italicizer.
+    if '<i>' in text:
+        return text
     m = _LEADING_ANCHOR_RE.match(text)
     if not m:
         return html.escape(text, quote=False)
@@ -853,10 +861,10 @@ def write_pronunciation_guide_entry(xml):
     xml.write('        <p class="entry-preamble">Handbók fyrir íslenskumælandi</p>\n')
     xml.write('        <div class="definition">\n')
     xml.write(
-        '            <p class="gloss-is">Klassískur (endurgerður) framburður forngrísku, '
-        'hvert tákn skýrt með íslensku orði sem hefur sama hljóð -- íslenska varðveitir '
-        'sérhljóðalengd, ómraðar/raddaðar lokhljóðapör og rúllað r sem enska hefur ekki, '
-        'svo hún er nákvæmari akkeri en ensk dæmi.</p>\n')
+        '            <p class="gloss-is">Attískur fimmtu aldar (f. Kr.) framburður. Gefin '
+        'eru framburðardæmi á íslensku þar sem hægt er. Röddun skortir í íslensku en með '
+        'þekkingu á ensku eða frönsku má framkalla hana. Þá eru stuttu e- og o-hljóðin '
+        'frábrugðin þeim íslensku en aftur má leita til ensku eða þýsku.</p>\n')
 
     def _write_table(heading, rows):
         xml.write('            <div class="morph-section">\n')
