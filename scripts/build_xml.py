@@ -801,7 +801,7 @@ _PRONUNCIATION_VOWELS = [
 _PRONUNCIATION_CONSONANTS = [
     ("β", "/b/", "b í e. bad"),
     ("γ", "/ɡ/", "g í fr. garçon (raddað)"),
-    ("γ á undan κ, χ, γ, μ", "/ŋ/", "n í langur"),
+    ("γ á undan κ, χ, γ, ξ, μ", "/ŋ/", "n í langur"),
     ("δ", "/d/", "d í fr. deux"),
     ("ζ", "/zd/", "st í staður (þó raddað: zd)"),
     ("θ", "/tʰ/", "t í töf"),
