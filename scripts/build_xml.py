@@ -762,6 +762,100 @@ def sanitize_apple_key(text):
     return kw
 
 
+# Reconstructed-classical Greek pronunciation, each symbol anchored to an
+# Icelandic word carrying the same sound -- Icelandic keeps phonemic vowel
+# length, unaspirated/aspirated stop pairs, and a rolled r that English
+# lacks, so it's a far more precise anchor for a reconstructed classical
+# pronunciation than English examples are. User-verified letter by letter
+# (see bin-morphology-recap.md); not derived from any single textbook's
+# wording.
+_PRONUNCIATION_VOWELS = [
+    ("ᾰ (stutt a)", "sem 1. a í ítölsku amare", "a í aska (stutt)"),
+    ("ᾱ (langt a)", "sem 2. a í ítölsku amare", "a í aka (langt)"),
+    ("ᾳ (langt a + hljóðritað jóta)", "sem ᾱ", "a-æ í ha-æ (þykkt hæ; ha yfir í hæ)"),
+    ("αι", "sem enskt high", "æ í bækur"),
+    ("αυ", "sem enskt how", "á í hár"),
+    ("ᾱυ", "sem αυ, en lengt", "a-á í ha-á (ha yfir í há)"),
+    ("ει", "sem þýskt Beet, Weg", "e í þ. Weg, ekki eins og í vegur (lokað e)"),
+    ("ευ", "sem „We-ug“ (þýskt Weg + ug)", "e-ú, „We-ug“ (Weg yfir í úg)"),
+    ("η (langt e)", "sem franskt tête", "lesa, vegur (opið e)"),
+    ("ῃ", "sem η + hljóðritað jóta", "le-eysa (lesa yfir í leysa)"),
+    ("ηυ", "sem η + υ", "le-úsa (lesa yfir í lúsa)"),
+    ("ῐ (stutt i)", "sem franskt vite", "í í ískra"),
+    ("ῑ (langt i)", "sem franskt vive", "ý í nýta"),
+    ("ο (stutt o)", "sem þýskt Gott", "ekki eins og í ostur, heldur enskt/þýskt o"),
+    ("οι", "sem franskt feuille (eða enskt boy)", "au í haust (eða og í bogi)"),
+    ("ου", "sem enskt pool", "ú í núna"),
+    ("υ (stutt)", "sem franskt lune", "u í undra"),
+    ("ῡ (langt u)", "sem franskt ruse", "u í muna"),
+    ("υι", "tvíhljóð", "ug í hugi"),
+    ("ω (langt o)", "sem enskt saw", "o í nota"),
+    ("ῳ", "sem ω + hljóðritað jóta (enskt boy / owe)", "og í bogi / ó í ól, ekki sólir (langt)"),
+]
+_PRONUNCIATION_CONSONANTS = [
+    ("β", "enskt b (nútíma gríska: franskt bon)", "b í „Big bad wolf“ (raddað)"),
+    ("γ", "hart g (nútíma gríska: franskt garçon)", "g í „good garçon“ (raddað)"),
+    ("γ á undan κ, χ, γ, μ", "ŋ (eins og í ink/song)", "n í langur"),
+    ("δ", "franskt d (nútíma gríska: enskt d)", "d í deux"),
+    ("ζ", "[zd], eins og í wisdom", "st í staður (nema raddað, þá zz)"),
+    ("θ", "t (áhersluborið) / th", "t í tala"),
+    ("κ", "eins og í kit", "g í gæti"),
+    ("λ", "franskt l / enskt l á undan sérhljóðum", "l í sæla"),
+    ("μ", "enskt m", "m í mæla"),
+    ("ν", "n (franskt/enskt net)", "n í næla"),
+    ("ξ", "ks", "x í lax"),
+    ("π", "eins og í pen", "b í bera"),
+    ("ρ", "skoskt rúllað r", "r í hringur (áhersluborið/tvöfaldað) eða r í sori (annars)"),
+    ("σ/ς (á undan β,γ,δ,μ)", "s / z", "s í sofa eða z í enskt zone"),
+    ("ττ (Attíska fyrir σσ)", "sem ττ", "dd í saddur eða ss í hissa"),
+    ("φ", "p (áhersluborið)", "p í pera"),
+    ("χ", "k (áhersluborið) / skoskt loch", "k í kæti"),
+    ("ψ", "ps", "taps (eflaust)"),
+    ("γγ", "= ŋg", "n í langur"),
+    ("ρρ", "= rhr", "rg í margt eða rhr í vorhringur"),
+]
+
+
+def write_pronunciation_guide_entry(xml):
+    """A hand-authored reference entry (not derived from LSJ/BÍN) mapping
+    reconstructed-classical Greek pronunciation onto Icelandic anchor
+    words -- see _PRONUNCIATION_VOWELS/_PRONUNCIATION_CONSONANTS above."""
+    entry_id = "pronunciation_guide"
+    title = "Framburður forngrísku"
+    xml.write(f'    <d:entry id="{entry_id}" d:title="{html.escape(title)}">\n')
+    for keyword in (title, "framburður", "framburður forngrísku",
+                    "íslenskur framburður forngrísku", "pronunciation",
+                    "pronunciation guide", "frambur"):
+        xml.write(f'        <d:index d:value="{html.escape(keyword)}"/>\n')
+    xml.write(f'        <h1 class="entry-lemma">{html.escape(title)}</h1>\n')
+    xml.write('        <p class="entry-preamble">Handbók fyrir íslenskumælandi</p>\n')
+    xml.write('        <div class="definition">\n')
+    xml.write(
+        '            <p class="gloss-is">Klassískur (endurgerður) framburður forngrísku, '
+        'hvert tákn skýrt með íslensku orði sem hefur sama hljóð -- íslenska varðveitir '
+        'sérhljóðalengd, ómraðar/raddaðar lokhljóðapör og rúllað r sem enska hefur ekki, '
+        'svo hún er nákvæmari akkeri en ensk dæmi.</p>\n')
+
+    def _write_table(heading, rows):
+        xml.write('            <div class="morph-section">\n')
+        xml.write(f'                <p class="morph-label">{html.escape(heading)}</p>\n')
+        xml.write('                <table class="morphology-table">\n')
+        xml.write('                    <tr><th>Tákn</th><th>Klassískt gildi</th>'
+                   '<th>Íslenskt akkeri</th></tr>\n')
+        for symbol, value, anchor in rows:
+            xml.write(
+                f'                    <tr><td class="case-label">{html.escape(symbol, quote=False)}</td>'
+                f'<td>{html.escape(value, quote=False)}</td>'
+                f'<td>{html.escape(anchor, quote=False)}</td></tr>\n')
+        xml.write('                </table>\n')
+        xml.write('            </div>\n')
+
+    _write_table("Sérhljóð og tvíhljóð", _PRONUNCIATION_VOWELS)
+    _write_table("Samhljóð", _PRONUNCIATION_CONSONANTS)
+    xml.write('        </div>\n')
+    xml.write('    </d:entry>\n\n')
+
+
 def build_dictionary():
     print("Starting Ancient Greek -> Icelandic Apple Dictionary XML generation...")
 
@@ -1323,6 +1417,8 @@ def build_dictionary():
 
             if (i + 1) % 20000 == 0:
                 print(f"   ... {i + 1}/{len(form_stub_candidates)} stub entries")
+
+        write_pronunciation_guide_entry(xml)
 
         xml.write('</d:dictionary>\n')
 
