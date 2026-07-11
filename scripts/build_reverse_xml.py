@@ -4,11 +4,10 @@ Icelandic), the same way icelandic-nordic-dictionary-mac inverts ISLEX for
 its x2is bundles.
 
 Coarser than the forward direction by construction:
-  1. Only single-word Icelandic glosses become reverse headwords -- a
-     multi-word phrase like "konungur, yfirmaður" as a sense doesn't have
-     one natural "headword" to invert on, so each comma-split single word
-     is indexed separately (both "konungur" and "yfirmaður" point back to
-     the Greek word that produced that sense).
+  1. Each comma-separated word of the concise gloss ("ala upp, mennta,
+     kenna") becomes its own reverse headword pointing back to the Greek
+     word -- including deliberate multiword units like "ala upp", which
+     are single glossary choices, not accidental phrase fragments.
   2. LSJ carries many pure ACCENT-placement variants of what is
      unambiguously the same Greek word as distinct headwords (e.g. hippos
      appearing with an acute, a grave, a circumflex, or no accent mark at
@@ -28,7 +27,6 @@ Greek, so Morpheus declension/principal-part data doesn't apply (same
 scope decision as icelandic-nordic-dictionary-mac's x2is bundles).
 """
 import html
-import json
 import os
 import sqlite3
 import unicodedata
@@ -57,23 +55,18 @@ def build_reverse_index():
 
     conn = sqlite3.connect(IS_DB_PATH)
     rows = conn.execute(
-        "SELECT lemma, definitions_is FROM definitions_is WHERE any_translated = 1"
+        "SELECT lemma, gloss_is FROM definitions_is WHERE any_translated = 1"
     ).fetchall()
     conn.close()
 
     print(f"Inverting {len(rows)} Greek entries with Icelandic glosses...")
 
     is_to_greek = defaultdict(set)
-    for lemma, defs_json in rows:
-        try:
-            senses = json.loads(defs_json)
-        except (json.JSONDecodeError, TypeError):
-            continue
-        for sense in senses:
-            for word in sense.split(","):
-                word = word.strip()
-                if word and " " not in word:
-                    is_to_greek[word.lower()].add(lemma)
+    for lemma, gloss in rows:
+        for word in gloss.split(","):
+            word = word.strip()
+            if word:
+                is_to_greek[word.lower()].add(lemma)
 
     print(f"Built {len(is_to_greek)} Icelandic headwords.")
 
@@ -92,11 +85,11 @@ def build_reverse_index():
 
             deduped = dedup_accent_variants(greek_lemmas)
 
-            xml.write(f'        <h1 class="entry-lemma">{html.escape(is_word)}</h1>\n')
+            xml.write(f'        <h1 class="entry-lemma">{html.escape(is_word, quote=False)}</h1>\n')
             xml.write('        <div class="definition">\n')
             xml.write('            <p class="gloss-en"><i>Forngrísk orð / Ancient Greek words:</i></p>\n')
             xml.write('            <p class="gloss-is">')
-            xml.write(", ".join(f'<b class="gk-word">{html.escape(gk)}</b>' for gk in sorted(deduped)))
+            xml.write(", ".join(f'<b class="gk-word">{html.escape(gk, quote=False)}</b>' for gk in sorted(deduped)))
             xml.write('</p>\n')
             xml.write('        </div>\n')
             xml.write('    </d:entry>\n\n')

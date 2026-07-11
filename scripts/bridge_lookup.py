@@ -39,11 +39,25 @@ TSV columns (1-indexed per data/IS-EN_glossary.READ.ME):
   12 IS->EN score   13 EN->IS score
 """
 import csv
+import math
 import os
 import re
 from functools import lru_cache
 
 GLOSSARY_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "IS-EN_glossary.tsv")
+WIKTIONARY_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "wiktionary_en_is.tsv")
+
+# Weights for merging the Wiktionary supplement (data/wiktionary_en_is.tsv,
+# built by build_wiktionary_supplement.py) into the candidate table. A
+# Wiktionary pair is one human editor's deliberate judgment, which is worth
+# more than a handful of corpus-alignment hits but shouldn't steamroll a
+# strong corpus consensus: existing candidates get their evidence topped up
+# (helping real words outrank artifacts via the evidence sweetener in
+# _ranked), and pairs the CLARIN glossary lacks entirely enter as new
+# candidates with a modest score -- enough to win when nothing better
+# exists, not enough to beat a well-scored corpus candidate.
+WIKTIONARY_EVIDENCE = 8
+WIKTIONARY_NEW_SCORE = 0.22
 
 WORD_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]+(?:[-'][A-Za-zÀ-ÖØ-öø-ÿ]+)*")
 
@@ -53,6 +67,60 @@ WORD_RE = re.compile(r"[A-Za-zÀ-ÖØ-öø-ÿ]+(?:[-'][A-Za-zÀ-ÖØ-öø-ÿ]+)*
 _OVERRIDES = {
     "one": "einn", "first": "fyrstur", "word": "orð", "not": "ekki",
     "no": "enginn", "yes": "já", "it": "það", "this": "þessi", "that": "sá",
+}
+
+# Curated translations for LSJ's most common gloss phrases where the
+# glossary's corpus-derived ranking picks the wrong *register*: the corpus
+# is modern Icelandic (news, software, Wikipedia), so "bring up" ranks
+# lyfta (hoist a thing) far above ala upp (rear a child), and "bear" ranks
+# bjarndýr (the animal) above bera (carry) -- but in a classical lexicon
+# these phrases almost always carry the older sense. Keyed by the phrase
+# as it appears after leading-article stripping, lowercase. Keep these
+# tables small and only for phrases verified to mistranslate; the POS
+# filter below handles the ordinary noun/verb collisions.
+#
+# _ANY entries are multiword phrasal verbs -- unambiguous in any POS
+# reading, safe to pin unconditionally. _VERB entries are single words
+# that are only traps in their *verb* reading ("bear"/"stay" as nouns
+# really are bjarndýr-the-animal / a prop), so they apply only when the
+# caller has established verbness (LSJ's "to X" marker or the headword's
+# morphology).
+_CLASSICAL_OVERRIDES_ANY = {
+    "bring up": "ala upp",
+    "lift up": "lyfta",
+    "stir up": "æsa",
+    "cry aloud": "hrópa",
+    "look at": "horfa á",
+    "take up": "taka upp",
+    "set upon": "ráðast á",
+    "run away": "flýja",
+    "put on": "klæðast",
+    "fall upon": "ráðast á",
+    "go through": "fara í gegnum",
+    "bring forth": "fæða",
+    "cut off": "höggva af",
+    "drive away": "reka burt",
+    "carry off": "ræna",
+    "call upon": "ákalla",
+    "set free": "frelsa",
+    # Single word, technically a noun/verb homograph in general English
+    # ("a count" = an earl), but not a genuine trap here: checked against
+    # every LSJ headword that glosses as bare "count" (22, all counting/
+    # reckoning verbs like ἀριθμέω, λογίζομαι, ψηφίζω) and none needed the
+    # nobility sense -- "greifi" was outranking "telja" whenever no POS
+    # hint happened to be available (e.g. λέγω, whose morph.db lemma entry
+    # is suppletive and carries no attestations under this headword at
+    # all, so there's no morphology signal to hint from).
+    "count": "telja",
+    # "hinsegin" scores highest for "different" (0.220, 8 hits) over
+    # well-attested "ólíkur" (0.118, 38 hits) -- a corpus artifact, and in
+    # contemporary Icelandic "hinsegin" primarily means "queer/LGBTQ+",
+    # not "of another kind"; jarring and confusing as a classics gloss.
+    "different": "ólíkur",
+}
+_CLASSICAL_OVERRIDES_VERB = {
+    "bear": "bera",
+    "stay": "vera kyrr",
 }
 
 _PLURAL_IRREGULAR = {
@@ -121,6 +189,26 @@ def _load():
                     cand["_casing"].items(),
                     key=lambda kv: (kv[1], kv[0].islower()),
                 )[0]
+
+    if os.path.exists(WIKTIONARY_PATH):
+        with open(WIKTIONARY_PATH, encoding="utf-8") as f:
+            for row in csv.reader(f, delimiter="\t"):
+                if len(row) != 3:
+                    continue
+                english, icelandic, en_pos = row
+                bucket = _table.setdefault(english, {})
+                cand = bucket.get(icelandic.lower())
+                if cand is not None:
+                    cand["evidence"] += WIKTIONARY_EVIDENCE
+                    if cand["en_pos"] in ("NULL", "", "Proper noun"):
+                        cand["en_pos"] = en_pos
+                else:
+                    bucket[icelandic.lower()] = {
+                        "score": WIKTIONARY_NEW_SCORE,
+                        "evidence": WIKTIONARY_EVIDENCE,
+                        "en_pos": en_pos, "is_pos": "",
+                        "surface": icelandic, "_casing": {icelandic: WIKTIONARY_EVIDENCE},
+                    }
     return _table
 
 
@@ -155,27 +243,60 @@ def _lemma_variants(word):
 MIN_EVIDENCE = 5
 
 
-def _ranked(en_word, cands, en_pos_hint=None, min_evidence=MIN_EVIDENCE):
+def _ranked(en_word, cands, en_pos_hint=None, min_evidence=MIN_EVIDENCE,
+            en_pos_require=None):
     """Rank a candidate dict by adjusted quality, best first. Candidates
     below min_evidence are dropped outright, not just down-weighted.
     Returns (surface_form, candidate_dict) pairs -- `cands` is keyed by the
     case-insensitive dedup key, not the display spelling; the display
-    spelling lives in candidate_dict["surface"]."""
+    spelling lives in candidate_dict["surface"].
+
+    en_pos_hint is a soft rerank (boost/penalty); en_pos_require is a hard
+    filter for when the POS is *certain* (e.g. LSJ's "to X" infinitive
+    marker): candidates whose explicit glossary POS conflicts with it are
+    dropped entirely, because no score multiplier can rescue "to bear" from
+    bjarndýr (the animal, score 0.6) when bera (carry, score 0.09) is the
+    right answer -- the corpus evidence is 6x against us and only grammar
+    knows better. Candidates with no POS tag survive the filter (half the
+    glossary is untagged; dropping those would gut coverage), and the
+    filter only engages at all if at least one candidate explicitly
+    matches, so a word with only conflicting tags degrades to the soft
+    ranking instead of returning nothing."""
     en_lower_word = en_word[0].islower() if en_word else True
-    qualified = [c for c in cands.values() if c["evidence"] >= min_evidence]
+    qualified = [
+        c for c in cands.values()
+        if c["evidence"] >= min_evidence
+        # Single ASCII letters are corpus-alignment junk (abbreviations:
+        # "north" -> "n"), never real translations. Genuine one-letter
+        # Icelandic words (á "river", í) all carry an accent, so the
+        # ASCII check keeps them.
+        and not (len(c["surface"]) == 1 and c["surface"].isascii())
+    ]
+    if en_pos_require and any(c["en_pos"] == en_pos_require for c in qualified):
+        qualified = [
+            c for c in qualified
+            if c["en_pos"] == en_pos_require or c["en_pos"] in ("NULL", "")
+        ]
     if not qualified:
         return []
     has_lowercase = any(c["surface"][0].islower() for c in qualified)
 
     def quality(c):
         icelandic = c["surface"]
-        q = c["score"]
+        # Evidence gently sweetens the score so near-ties break toward the
+        # better-attested candidate: "god" scores drottinn 0.257 (22 hits)
+        # vs gud 0.254 (48 hits), and only evidence knows gud is the word.
+        q = c["score"] * (1 + 0.1 * math.log10(max(c["evidence"], 1)))
         if en_lower_word and icelandic[0].isupper() and has_lowercase:
             q *= 0.15
         if en_lower_word and c["en_pos"] == "Proper noun":
             q *= 0.3
+        # Identity pairs (EN "ball" -> IS "ball", a dance) are usually a
+        # loanword or corpus artifact wearing a perfect score; a genuine
+        # cognate translation still wins when nothing else qualifies,
+        # since the penalty only matters relative to competitors.
         if icelandic.lower() == en_word.lower():
-            q *= 0.2
+            q *= 0.1
         if en_pos_hint:
             if c["en_pos"] == en_pos_hint:
                 q *= 1.4
@@ -208,7 +329,7 @@ def _candidates_for(word):
 
 
 @lru_cache(maxsize=200_000)
-def top_candidates(word, en_pos_hint=None, n=2):
+def top_candidates(word, en_pos_hint=None, n=2, en_pos_require=None):
     """Up to n Icelandic candidates for one English word, best first.
     Returns a list of (icelandic, is_pos) tuples; empty if nothing trustworthy."""
     lower = word.lower()
@@ -218,7 +339,7 @@ def top_candidates(word, en_pos_hint=None, n=2):
     cands, _ = _candidates_for(word)
     if not cands:
         return []
-    ranked = _ranked(word, cands, en_pos_hint)
+    ranked = _ranked(word, cands, en_pos_hint, en_pos_require=en_pos_require)
     out = []
     best_score = None
     for icelandic, c in ranked:
@@ -233,7 +354,7 @@ def top_candidates(word, en_pos_hint=None, n=2):
 
 
 @lru_cache(maxsize=200_000)
-def phrase_match(phrase, en_pos_hint=None):
+def phrase_match(phrase, en_pos_hint=None, en_pos_require=None):
     """Whole-phrase glossary match only (no word-by-word reconstruction).
     These are real editorial multiword entries (idioms like "run away" ->
     "strjúka"), so they get a lower evidence bar than single-word lookups --
@@ -243,7 +364,8 @@ def phrase_match(phrase, en_pos_hint=None):
     cands = table.get(key)
     if not cands:
         return None
-    ranked = _ranked(phrase, cands, en_pos_hint, min_evidence=2)
+    ranked = _ranked(phrase, cands, en_pos_hint, min_evidence=2,
+                     en_pos_require=en_pos_require)
     if not ranked:
         return None
     return ranked[0][0]
@@ -268,10 +390,47 @@ def translate_glossary_phrase(phrase, en_pos_hint=None):
     Icelandic and nobody chose that combination on purpose. A polysemous
     Greek word's other multi-word senses just don't get an Icelandic gloss
     for that particular sense -- see README.
+
+    The stripped article isn't just noise, it's grammar: LSJ writes verbs
+    as "to bear" and nouns as "a city"/"the word", so the article pins the
+    phrase's POS with certainty and becomes a hard candidate filter
+    (en_pos_require in _ranked) -- stronger than en_pos_hint, which is a
+    statistical guess from the headword's morphology.
     """
-    stripped = _LEADING_ARTICLE_RE.sub("", phrase.strip())
+    stripped_full = phrase.strip()
+    m = _LEADING_ARTICLE_RE.match(stripped_full)
+    en_pos_require = None
+    if m:
+        article = m.group(1).lower()
+        en_pos_require = "Verb" if article == "to" else "Noun"
+        # An explicit article outranks the statistical hint; drop the hint
+        # when they disagree so the boost doesn't fight the filter.
+        if en_pos_hint and en_pos_hint != en_pos_require:
+            en_pos_hint = None
+    elif en_pos_hint:
+        # No article marker, but the headword's own morphology gives a POS
+        # hint -- promote it from a soft rerank to a hard filter too, same
+        # as the article case. A soft 1.4x/0.7x nudge isn't always enough:
+        # koinos ("common", an adjective) has an en_pos_hint of "Adjective",
+        # but its LSJ sense "general" ranks the noun "hershöfðingi" (a
+        # military commander, score 0.439/50 hits) so far above the correct
+        # adjective "almennur" (score 0.139/39 hits) that the soft penalty
+        # can't close the gap -- 0.439*0.7 still beats 0.139*1.4. _ranked's
+        # filter is a safe no-op when nothing matches the required POS (see
+        # "profane" below), so this can't zero out a translation that has
+        # no same-POS alternative -- it only kicks in when a better-POS
+        # candidate actually exists to prefer instead.
+        en_pos_require = en_pos_hint
+    stripped = _LEADING_ARTICLE_RE.sub("", stripped_full)
     if not stripped:
         return None
+
+    key = " ".join(stripped.lower().split())
+    classical = _CLASSICAL_OVERRIDES_ANY.get(key)
+    if classical is None and "Verb" in (en_pos_require, en_pos_hint):
+        classical = _CLASSICAL_OVERRIDES_VERB.get(key)
+    if classical:
+        return classical
 
     tokens = WORD_RE.findall(stripped)
     if len(tokens) == 1:
@@ -280,11 +439,13 @@ def translate_glossary_phrase(phrase, en_pos_hint=None):
         # for genuine multiword idioms and would let noise back in here
         # (e.g. "shade" matching the same weakly-attested table entry that
         # top_candidates would correctly reject).
-        cands = top_candidates(tokens[0], en_pos_hint, n=1)
+        cands = top_candidates(tokens[0], en_pos_hint, n=1,
+                               en_pos_require=en_pos_require)
         return cands[0][0] if cands else None
 
     if len(tokens) > 1:
-        return phrase_match(stripped, en_pos_hint)
+        return phrase_match(stripped, en_pos_hint,
+                            en_pos_require=en_pos_require)
 
     return None
 

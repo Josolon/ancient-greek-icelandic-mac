@@ -50,6 +50,29 @@ https://creativecommons.org/licenses/by/4.0/
 Árni Magnússon Institute for Icelandic Studies / Reykjavik University, via
 CLARIN Iceland. See CREDITS.md for full author list.
 
+## Data — Wiktionary Supplement (Creative Commons Attribution-ShareAlike 4.0)
+
+The supplementary EN->IS pairs (`data/wiktionary_en_is.tsv`), extracted
+from English Wiktionary via kaikki.org/wiktextract, are licensed under:
+
+**Creative Commons Attribution-ShareAlike 4.0 International** (dual with GFDL)
+https://creativecommons.org/licenses/by-sa/4.0/
+
+**Attribution:** English Wiktionary contributors, via kaikki.org
+(wiktextract by Tatu Ylonen). See CREDITS.md for full citation.
+
+## Data — Icelandic Morphology / BÍN (Creative Commons Attribution-ShareAlike 4.0)
+
+The extracted Icelandic declension/verb-form data
+(`data/is_noun_declension.tsv`, `data/is_verb_forms.tsv`), sourced from
+BÍN (Beygingarlýsing íslensks nútímamáls / DMII), is licensed under:
+
+**Creative Commons Attribution-ShareAlike 4.0 International**
+https://creativecommons.org/licenses/by-sa/4.0/
+
+**Attribution:** Kristín Bjarnadóttir, The Árni Magnússon Institute for
+Icelandic Studies, via CLARIN Iceland. See CREDITS.md for full citation.
+
 ## Data — Generated Icelandic Glosses (Creative Commons Attribution-ShareAlike 4.0)
 
 The Icelandic bridge glosses this project generates (`data/lsj_is.db`, and
@@ -72,6 +95,8 @@ CC BY-SA 4.0.**
 
 When distributing this dictionary:
 1. Include/reference all licenses above
-2. Attribute the Chicago LSJ source and the CLARIN bridge glossary (see CREDITS.md)
-3. Any derivative works using the generated Icelandic glosses must also be CC BY-SA 4.0
+2. Attribute the Chicago LSJ source, the CLARIN bridge glossary, the
+   Wiktionary supplement, and the BÍN morphology data (see CREDITS.md)
+3. Any derivative works using the generated Icelandic glosses or
+   morphology data must also be CC BY-SA 4.0
 

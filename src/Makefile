@@ -14,6 +14,9 @@ BUILD_DICT_XML       = $(DICT_BUILD_TOOL_DIR)/build_dict.sh
 
 MIN_OS_VERSION   = 10.6
 export MACOSX_DEPLOYMENT_TARGET=$(MIN_OS_VERSION)
+# Resolve the plist DTD locally instead of fetching it from apple.com, whose
+# served DTD is intermittently malformed and breaks xmllint validation.
+export XML_CATALOG_FILES=$(CURDIR)/xml-catalog.xml
 DICT_BUILD_DIR   = ./objects
 INSTALL_DIR      = $(HOME)/Library/Dictionaries
 

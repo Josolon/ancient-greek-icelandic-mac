@@ -38,6 +38,36 @@ This is the same glossary used (in the opposite lookup direction) by the
 companion [`icelandic-english-dictionary-mac`](https://github.com/Josolon/icelandic-english-dictionary-mac)
 project.
 
+## Wiktionary Supplement
+
+Supplementary English -> Icelandic pairs (`data/wiktionary_en_is.tsv`)
+extracted from the Icelandic entries of the English Wiktionary, via the
+[kaikki.org](https://kaikki.org/dictionary/Icelandic/) machine-readable
+dictionaries built with [wiktextract](https://github.com/tatuylonen/wiktextract):
+Tatu Ylonen, *Wiktextract: Wiktionary as Machine-Readable Structured
+Data*, Proceedings of the 13th Conference on Language Resources and
+Evaluation (LREC), pp. 1317-1325, Marseille, 20-25 June 2022.
+Wiktionary content license: Creative Commons CC BY-SA and GFDL (dual).
+https://en.wiktionary.org/
+
+## Icelandic Morphology (BÍN)
+
+Beygingarlýsing íslensks nútímamáls (BÍN) / Database of Modern Icelandic
+Inflection (DMII), "Sigrúnarsnið" CSV export.
+Compiled by Kristín Bjarnadóttir -- The Árni Magnússon Institute for
+Icelandic Studies, via CLARIN Iceland.
+License: CC BY-SA 4.0.
+https://repository.clarin.is/repository/xmlui/handle/20.500.12537/5
+https://bin.arnastofnun.is/
+
+Used to render an Icelandic-inflected form (declension for nouns, tense/
+mood periphrasis for verbs) alongside each Greek morphological form in the
+forward dictionary's declension and principal-parts tables -- see "How
+this works" in README.md. Only extracted for the small set of Icelandic
+words this dictionary's own generated glossary actually produces
+(`data/is_noun_declension.tsv`, `data/is_verb_forms.tsv`), not the full
+~300,000-lemma database.
+
 ## Tooling
 
 Bridge-translation and Apple Dictionary build pipeline in this repository:
@@ -47,5 +77,6 @@ Jónatan Sólon. Adapted from the build pipeline of `ancient-greek-mac`.
 
 Always keep this CREDITS.md and the per-source attribution intact when
 sharing anything derived from this repository. The compiled `.dictionary`
-bundle is a derivative of CC BY-SA (LSJ) and CC BY (glossary) sources -- see
-LICENSE for how those terms combine.
+bundle is a derivative of CC BY-SA (LSJ), CC BY (glossary), CC BY-SA
+(Wiktionary), and CC BY-SA (BÍN) sources -- see LICENSE for how those
+terms combine.

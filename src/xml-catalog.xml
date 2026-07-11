@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<!-- Maps the plist DTD's network URL to the local system copy so
+     build_dict.sh's xmllint validation doesn't depend on apple.com,
+     whose served DTD is intermittently malformed ("Comment not
+     terminated") and kills the build for no real reason. -->
+<catalog xmlns="urn:oasis:names:tc:entity:xmlns:xml:catalog">
+  <system systemId="http://www.apple.com/DTDs/PropertyList-1.0.dtd"
+          uri="file:///System/Library/DTDs/PropertyList.dtd"/>
+</catalog>

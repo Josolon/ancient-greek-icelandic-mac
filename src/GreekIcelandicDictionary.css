@@ -45,6 +45,15 @@ p.gloss-en {
     font-style: italic;
 }
 
+/* Full LSJ sense list, shown as secondary reference below the concise
+   shortdef-derived gloss lines */
+p.senses-ref {
+    margin: 4px 0 0 0;
+    color: #999;
+    font-size: 0.8em;
+    line-height: 1.4;
+}
+
 /* --- Sense Blocks --- */
 div.sense {
     margin-top: 3px;
@@ -222,7 +231,19 @@ p.morph-label {
     color: #2a4a8a;
     font-size: 0.95em;
     white-space: nowrap;
-    width: 90px;
+    width: 110px;
+}
+
+/* Classical (Greek) grammar parse -- the "Latin" markers, muted, sitting
+   above the Icelandic parse of the rendering */
+.tag-cl {
+    color: #8a6a3a;
+    font-size: 0.9em;
+}
+/* Icelandic grammar parse of the rendering */
+.tag-is {
+    color: #2a4a8a;
+    font-size: 0.95em;
 }
 
 .morphology-table tr:last-child td {
@@ -231,4 +252,23 @@ p.morph-label {
 
 .morphology-table tr:nth-child(even) td {
     background-color: #f7f9ff;
+}
+
+/* Icelandic case-form / periphrasis sub-line under a Greek form, inside a
+   morphology-table cell (BÍN-sourced -- see build_is_morphology.py) */
+.is-gloss-form {
+    font-family: -apple-system, "Helvetica Neue", sans-serif;
+    font-style: italic;
+    color: #5a6a8a;
+    font-size: 0.92em;
+}
+
+/* Small caption below a morphology table naming which Icelandic gloss
+   word the table's is-gloss-form sub-lines are inflecting */
+p.morph-note {
+    margin: 4px 0 0 0;
+    padding: 3px 10px;
+    color: #888;
+    font-size: 0.78em;
+    font-style: italic;
 }

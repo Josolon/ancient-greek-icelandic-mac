@@ -1,0 +1,4 @@
+# Only scripts/build_is_morphology.py needs this -- every other script in
+# the pipeline is stdlib-only. Install into a project-local venv:
+#   python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+islenska>=1.3.2

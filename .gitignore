@@ -6,6 +6,13 @@ data/lsj.db
 data/morph.db
 data/lsj_is.db
 data/IS-EN_glossary.tsv
+# Raw Wiktionary dump (70MB, redownload from kaikki.org); the derived
+# data/wiktionary_en_is.tsv is small and IS committed
+data/kaikki-icelandic.jsonl
+# Raw BÍN/DMII export (330MB, CLARIN handle 20.500.12537/5); the derived
+# data/is_noun_declension.tsv and data/is_verb_forms.tsv are small and
+# ARE committed
+data/BIN_SHsnid.csv
 
 # Generated dictionary source XML (~200MB forward, smaller reverse)
 src/GreekIcelandicDictionary.xml
