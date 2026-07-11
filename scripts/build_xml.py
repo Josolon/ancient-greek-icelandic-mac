@@ -23,6 +23,7 @@ and different variants can carry different attested inflected forms.
 import sqlite3
 import html
 import os
+import re
 import unicodedata
 import json
 from collections import defaultdict
@@ -766,56 +767,75 @@ def sanitize_apple_key(text):
 # Icelandic word carrying the same sound -- Icelandic keeps phonemic vowel
 # length, unaspirated/aspirated stop pairs, and a rolled r that English
 # lacks, so it's a far more precise anchor for a reconstructed classical
-# pronunciation than English examples are. Verbatim from the user's own
-# table (data/greek_pronunciation.rtf-derived) -- the Icelandic-anchor
-# column is exactly as the user wrote it, including spelling, since it
-# records a specific personal pronunciation judgment that isn't ours to
-# rephrase or "correct".
+# pronunciation than English examples are. The Icelandic-anchor column is
+# exactly as the user wrote it, including spelling, since it records a
+# specific personal pronunciation judgment that isn't ours to rephrase or
+# "correct"; the IPA column is added for cross-reference. gg is omitted --
+# same sound as "g before k,ch,g,m" above it, already covered there.
 _PRONUNCIATION_VOWELS = [
-    ("ᾰ (short a)", "a í aska (stutt)"),
-    ("ᾱ (long a)", "a í aka (langt)"),
-    ("ᾳ (long a + iota)", "a-æ í ha-æ (þykt hæ; ha yfir í hæ)"),
-    ("αι", "æ í bækur"),
-    ("αυ", "á í hár"),
-    ("āυ", "a-á í ha-á (ha yfir í há)"),
-    ("ει", "e í þ. Weg, ekki vegur (lokað)"),
-    ("ευ", "e-ú / \"We-ug\" (Weg yfir í úg)"),
-    ("η (long e)", "lesa, vegur (opið)"),
-    ("ῃ", "le-eysa (lesa yfir í leysa)"),
-    ("ηυ", "le-úsa (lesa yfir í lúsa)"),
-    ("ῐ (short i)", "í í ískra"),
-    ("ῑ (long i)", "ý í nýta"),
-    ("ο (short o)", "ekki o í ostur heldur enskt eða þýskt o"),
-    ("οι", "au í haust (eða og í bogi)"),
-    ("ου", "ú í núna"),
-    ("υ (short)", "u í undra"),
-    ("ῡ (long u)", "u í muna"),
-    ("υι", "ug í hugi"),
-    ("ω (long o)", "o í nota"),
-    ("ῳ", "og í bogi / ó í ól, ekki sólir (langt)"),
+    ("ᾰ", "/a/", "a í aska (stutt)"),
+    ("ᾱ", "/aː/", "a í aka (langt)"),
+    ("ᾳ", "/aːi/", "a-æ í ha-æ (ýkt hæ; ha yfir í hæ)"),
+    ("αι", "/ai/", "æ í bækur"),
+    ("αυ", "/au/", "á í hár"),
+    ("āυ", "/aːu/", "a-á í ha-á (ha yfir í há)"),
+    ("ει", "/eː/", "e í þ. Weg, ekki vegur (lokað)"),
+    ("ευ", "/eu/", "e-ú / \"We-ug\" (Weg yfir í úg)"),
+    ("η", "/ɛː/", "lesa, vegur (opið)"),
+    ("ῃ", "/ɛːi/", "le-eysa (lesa yfir í leysa)"),
+    ("ηυ", "/ɛːu/", "le-úsa (lesa yfir í lúsa)"),
+    ("ῐ", "/i/", "í í ískra"),
+    ("ῑ", "/iː/", "ý í nýta"),
+    ("ο", "/o/", "ekki o í ostur heldur enskt eða þýskt o"),
+    ("οι", "/oi/", "au í haust (eða og í bogi)"),
+    ("ου", "/uː/", "ú í núna"),
+    ("υ", "/y/", "u í undra"),
+    ("ῡ", "/yː/", "u í muna"),
+    ("υι", "/yi/", "ug í hugi"),
+    ("ω", "/ɔː/", "o í nota"),
+    ("ῳ", "/ɔːi/", "og í bogi / ó í ól, ekki sólir (langt)"),
+    ("ωυ", "/ɔːu/", "ó í ól (langt)"),
 ]
 _PRONUNCIATION_CONSONANTS = [
-    ("β", "b í Big bad wolf (raddað)"),
-    ("γ", "g í good garçon (raddað)"),
-    ("γ before κ,χ,γ,μ", "n í langur"),
-    ("δ", "d í deux"),
-    ("ζ", "st í staður (nema raddað zz)"),
-    ("θ", "t í tala"),
-    ("κ", "g í gæti"),
-    ("λ", "l í sæla"),
-    ("μ", "m í mæla"),
-    ("ν", "n í næla"),
-    ("ξ", "x í lax"),
-    ("π", "b í bera"),
-    ("ρ", "r í hringur (when aspirated or doubled)/ r í sori (when unaspirated)"),
-    ("σ/ς before β,γ,δ,μ", "s í sofa\nz í Eng. zone"),
-    ("ττ / σσ", "dd í saddur\nss í hissa"),
-    ("φ", "p í pera"),
-    ("χ", "k í kæti"),
-    ("ψ", "taps (ef.)"),
-    ("γγ", "n í langur"),
-    ("ρρ", "rg í margt; rhr í vorhringur"),
+    ("β", "/b/", "b í e. bad"),
+    ("γ", "/ɡ/", "g í good garçon (raddað)"),
+    ("γ before κ,χ,γ,μ", "/ŋ/", "n í langur"),
+    ("δ", "/d/", "d í deux"),
+    ("ζ", "/zd/", "st í staður (þó raddað: zd)"),
+    ("θ", "/tʰ/", "t í tala"),
+    ("κ", "/k/", "g í gæti"),
+    ("λ", "/l/", "l í sæla"),
+    ("μ", "/m/", "m í mæla"),
+    ("ν", "/n/", "n í næla"),
+    ("ξ", "/ks/", "x í lax"),
+    ("π", "/p/", "b í bera"),
+    ("ρ", "/r/", "r í vor"),
+    ("ῥ", "/r̥/", "r í hringur"),
+    ("σ/ς", "/s/", "s í sofa"),
+    ("σ/ς before β, γ, δ, μ", "/z/", "z í e. zone"),
+    ("ττ", "/tː/", "dd í saddur"),
+    ("σσ", "/sː/", "ss í hissa"),
+    ("φ", "/pʰ/", "p í pera"),
+    ("χ", "/kʰ/", "k í kæti"),
+    ("ψ", "/ps/", "ps í taps(ins)"),
+    ("ρρ", "/rʰ/", "rg í margt; rhr í vorhringur"),
 ]
+
+# The Icelandic-anchor column follows a "LETTER í WORD" convention --
+# italicize only that leading letter (once, at the start of the string),
+# not every "í" that appears later in a parenthetical aside (e.g. "...ha
+# yfir í hæ", where that "í" is just the Icelandic preposition, not
+# another anchor-letter demonstration).
+_LEADING_ANCHOR_RE = re.compile(r'^(\S+) í ')
+
+
+def _render_anchor_html(text):
+    m = _LEADING_ANCHOR_RE.match(text)
+    if not m:
+        return html.escape(text, quote=False)
+    lead = html.escape(m.group(1), quote=False)
+    rest = html.escape(text[m.end():], quote=False)
+    return f'<i>{lead}</i> í {rest}'
 
 
 def write_pronunciation_guide_entry(xml):
@@ -842,11 +862,13 @@ def write_pronunciation_guide_entry(xml):
         xml.write('            <div class="morph-section">\n')
         xml.write(f'                <p class="morph-label">{html.escape(heading)}</p>\n')
         xml.write('                <table class="morphology-table">\n')
-        xml.write('                    <tr><th>Tákn</th><th>Íslenskt akkeri</th></tr>\n')
-        for symbol, anchor in rows:
+        xml.write('                    <tr><th>Tákn</th><th>IPA</th>'
+                   '<th>Íslensk hjálpardæmi</th></tr>\n')
+        for symbol, ipa, anchor in rows:
             xml.write(
                 f'                    <tr><td class="case-label">{html.escape(symbol, quote=False)}</td>'
-                f'<td>{html.escape(anchor, quote=False)}</td></tr>\n')
+                f'<td>{html.escape(ipa, quote=False)}</td>'
+                f'<td>{_render_anchor_html(anchor)}</td></tr>\n')
         xml.write('                </table>\n')
         xml.write('            </div>\n')
 
