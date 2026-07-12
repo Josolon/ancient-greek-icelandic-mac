@@ -115,12 +115,18 @@ CASES = {"NF": "nominative", "ÞF": "accusative", "ÞGF": "dative", "EF": "genit
 NUMBERS = {"ET": "singular", "FT": "plural"}
 GENDERS = {"KK": "masculine", "KVK": "feminine", "HK": "neuter"}
 
-# Adjective (lo) positive-degree strong declension: FSB-{gender}-{case}{number}
-# (Frumstig = positive, Sterk beyging = strong/indefinite). Strong is the
-# citation paradigm -- the weak (FVB) forms are the "góði" definite-context
-# ones. Greek adjectives inflect for case/gender/number with no
-# definiteness distinction, so the strong forms are the right target.
-_ADJ_TAG_PREFIX = "FSB-"
+# Adjective (lo) strong/indefinite declension, one tag prefix per degree:
+# FSB (Frumstig Sterk beyging, positive), MST (Miðstig, comparative -- no
+# strong/weak split in Icelandic), ESB (Efsta stig Sterk beyging,
+# superlative). Strong is the citation paradigm in each degree -- the weak
+# (FVB/EVB) forms are the "góði"/"besti" definite-context ones. Greek
+# adjectives inflect for case/gender/number with no definiteness
+# distinction, so the strong forms are the right target throughout.
+# Morpheus tags each Greek adjective FORM with its own degree (positive/
+# comparative/superlative, see data/morph.db's `degree` column) -- a
+# comparative Greek form like sophoteros must render against MST, not
+# FSB, or the dictionary shows the wrong Icelandic word entirely.
+_ADJ_DEGREE_TAG_PREFIX = {"FSB": "positive", "MST": "comparative", "ESB": "superlative"}
 
 # BÍN grammatical-tag component -> slot-key component. Finite verb tags in
 # Sigrúnarsnið are "VOICE-MOOD-TENSE-PERSON-NUMBER" (e.g. GM-FH-NT-3P-ET);
@@ -203,13 +209,17 @@ _PARTICIPLE_TAGS = {
 
 
 def parse_adj_slot(tag):
-    """BÍN positive-strong adjective tag (FSB-{gender}-{case}{number}) ->
-    (case_name, gender_name, number_name), or None. Ignores comparative
-    (MST) / superlative (EST) and weak (FVB) forms -- only the positive
-    strong paradigm, the citation declension a Greek adjective form maps to."""
-    if not tag.startswith(_ADJ_TAG_PREFIX):
+    """BÍN strong-declension adjective tag (FSB/MST/ESB-{gender}-{case}
+    {number}) -> (degree_name, case_name, gender_name, number_name), or
+    None. Ignores weak (FVB/EVB) forms -- only the strong paradigm, the
+    citation declension a Greek adjective form maps to, in each of the
+    three degrees. A few MST cells carry an alternate spelling suffixed
+    "2" (e.g. NFET2) -- skipped here (number lookup fails), same as any
+    other unrecognized tag; the primary spelling is enough."""
+    prefix, _, rest = tag.partition("-")
+    degree = _ADJ_DEGREE_TAG_PREFIX.get(prefix)
+    if degree is None or not rest:
         return None
-    rest = tag[len(_ADJ_TAG_PREFIX):]  # e.g. "KK-NFET"
     parts = rest.split("-")
     if len(parts) != 2:
         return None
@@ -225,7 +235,7 @@ def parse_adj_slot(tag):
             break
     if not case or not number:
         return None
-    return (case, gender, number)
+    return (degree, case, gender, number)
 
 
 def _target_words():
@@ -465,9 +475,9 @@ def main():
         for headword in sorted(adj_data):
             entry_id = min(adj_data[headword], key=int)
             cells = adj_data[headword][entry_id]
-            for (case_name, gender_name, number_name) in sorted(cells):
-                out.write(f"{headword}\t{case_name}\t{gender_name}\t{number_name}\t"
-                          f"{cells[(case_name, gender_name, number_name)]}\n")
+            for (degree_name, case_name, gender_name, number_name) in sorted(cells):
+                out.write(f"{headword}\t{degree_name}\t{case_name}\t{gender_name}\t{number_name}\t"
+                          f"{cells[(degree_name, case_name, gender_name, number_name)]}\n")
                 adj_rows += 1
 
     with open(ADJ_LEMMA_OUT_PATH, "w", encoding="utf-8") as out:

@@ -177,6 +177,7 @@ _CLASSICAL_ABBR = {
               'future perfect': 'futp.'},
     'voice': {'active': 'act.', 'middle': 'med.', 'passive': 'pass.',
               'middle/passive': 'medpass.'},
+    'degree': {'comparative': 'comp.', 'superlative': 'superl.'},
 }
 _ICELANDIC_ABBR = {
     'case': {'nominative': 'nf.', 'genitive': 'ef.', 'dative': 'þgf.',
@@ -191,6 +192,7 @@ _ICELANDIC_ABBR = {
               'future perfect': 'þframt.'},
     'voice': {'active': 'gm.', 'middle': 'mm.', 'passive': 'þm.',
               'middle/passive': 'mm./þm.'},
+    'degree': {'comparative': 'mst.', 'superlative': 'est.'},
 }
 
 
@@ -199,7 +201,7 @@ _PN_NUMBERS = frozenset(('singular', 'plural', 'dual'))
 
 
 def _grammar_tag(scheme, case=None, gender=None, person=None, number=None,
-                 mood=None, tense=None, voice=None, fuse_subj=False):
+                 mood=None, tense=None, voice=None, fuse_subj=False, degree=None):
     """One space-joined grammar tag in the given abbreviation `scheme`
     (_CLASSICAL_ABBR or _ICELANDIC_ABBR), canonical field order. When
     fuse_subj is set (the Icelandic parse only), a Greek subjunctive/
@@ -214,6 +216,11 @@ def _grammar_tag(scheme, case=None, gender=None, person=None, number=None,
         parts.append(ab('case', case))
     if gender:
         parts.append(ab('gender', gender))
+    # Positive degree is the unmarked default (never labeled, same as an
+    # unmarked active voice would be for a verb whose voice is obvious) --
+    # only comparative/superlative are ever worth calling out.
+    if degree in ('comparative', 'superlative'):
+        parts.append(ab('degree', degree))
     if person:
         parts.append(ab('person', person))
     if number:
@@ -723,18 +730,20 @@ def load_is_verb_forms():
 
 
 def load_is_adj_declension():
-    """data/is_adj_declension.tsv (lemma, case, gender, number, form) ->
-    {lemma: {(case, gender, number): form}} (positive strong declension)."""
+    """data/is_adj_declension.tsv (lemma, degree, case, gender, number,
+    form) -> {lemma: {(degree, case, gender, number): form}} -- strong
+    declension in all three degrees (positive/comparative/superlative;
+    see build_is_morphology.py's parse_adj_slot)."""
     data = defaultdict(dict)
     if not os.path.exists(ADJ_DECL_PATH):
         return data
     with open(ADJ_DECL_PATH, encoding='utf-8') as f:
         for line in f:
             parts = line.rstrip('\n').split('\t')
-            if len(parts) != 5:
+            if len(parts) != 6:
                 continue
-            lemma, case_name, gender, number, form = parts
-            data[lemma][(case_name, gender, number)] = form
+            lemma, degree, case_name, gender, number, form = parts
+            data[lemma][(degree, case_name, gender, number)] = form
     return data
 
 
@@ -1058,7 +1067,7 @@ def build_dictionary():
             morph_rows = []
             for _, lemma, _ in members:
                 morph_cursor.execute("""
-                    SELECT form, form_normalized, pos, tense, voice, mood, person, number, case_name, gender
+                    SELECT form, form_normalized, pos, tense, voice, mood, person, number, case_name, gender, degree
                     FROM morphology WHERE lemma = ?
                 """, (lemma,))
                 morph_rows.extend(morph_cursor.fetchall())
@@ -1070,10 +1079,17 @@ def build_dictionary():
             # separate from is_verb/is_noun_adj, which merge several pos
             # values (noun/adjective/article/pronoun) into one boolean.
             pos_kinds = set()
-            # 3D noun/adjective grid, keyed (case, gender, number) -> forms.
+            # 4D noun/adjective grid, keyed (degree, case, gender, number)
+            # -> forms. degree is 'positive' for every noun (Morpheus's
+            # degree column is only ever populated for adjectives) and for
+            # an adjective's own positive-degree forms; comparative/
+            # superlative Greek forms get their own degree key so they
+            # never collapse into the same cell (and same Icelandic
+            # rendering) as the positive form.
             noun_grid = defaultdict(set)
             noun_grid_raw = defaultdict(set)
             noun_genders = set()
+            adj_degrees = set()
             verb_principal_parts = defaultdict(set)
             verb_secondary_moods = defaultdict(set)
             # raw_form -> set of (tense, voice, mood, person, number) parsings,
@@ -1097,6 +1113,7 @@ def build_dictionary():
                 number = mr[7]
                 case_name = mr[8]
                 gender = mr[9]
+                degree = str(mr[10]).lower() if mr[10] else 'positive'
 
                 # Only the exact accented inflected form indexes the main
                 # (lemma) entry directly -- NOT its accent-stripped
@@ -1144,13 +1161,19 @@ def build_dictionary():
                 elif pos in ('noun', 'adjective', 'article', 'pronoun'):
                     is_noun_adj = True
                     if case_name and number and gender:
-                        # 3D grid [case][gender][number]: a Greek noun has one
-                        # gender, but a Greek adjective (also tagged 'noun' by
-                        # Morpheus) spans all three, and the Icelandic gloss
-                        # word -- if it's an adjective -- must agree per gender.
-                        noun_grid[(case_name, gender, number)].add(display_form)
-                        noun_grid_raw[(case_name, gender, number)].add(raw_form)
+                        # 4D grid [degree][case][gender][number]: a Greek
+                        # noun has one gender, but a Greek adjective (also
+                        # tagged 'noun' by Morpheus) spans all three, and
+                        # the Icelandic gloss word -- if it's an adjective
+                        # -- must agree per gender AND per degree (a
+                        # comparative/superlative Greek form must never
+                        # share a cell, or an Icelandic rendering, with the
+                        # positive form of the same case/gender/number).
+                        noun_grid[(degree, case_name, gender, number)].add(display_form)
+                        noun_grid_raw[(degree, case_name, gender, number)].add(raw_form)
                         noun_genders.add(str(gender).lower())
+                        if degree != 'positive':
+                            adj_degrees.add(degree)
 
                 else:
                     parsing_elements = []
@@ -1250,21 +1273,69 @@ def build_dictionary():
             is_adj = adj_declension.get(is_word) if is_word else None
             is_verb_slots = verb_forms.get(is_word) if is_word else None
 
-            def _nominal_rendering(case, gender, number):
-                """Icelandic inflected form for a (case, gender, number)
-                cell: an adjective declines per gender; a noun has one fixed
-                gender and takes the definite-suffix format. Icelandic has
-                no vocative case -- ávarpsfall is always identical to the
-                nominative -- so a Greek vocative cell renders the
-                nominative Icelandic form rather than nothing."""
+            def _nominal_rendering(case, gender, number, degree='positive'):
+                """Icelandic inflected form for a (degree, case, gender,
+                number) cell: an adjective declines per gender AND degree
+                (positive/comparative/superlative -- a noun has no degree,
+                always 'positive', and takes the definite-suffix format
+                instead). Icelandic has no vocative case -- ávarpsfall is
+                always identical to the nominative -- so a Greek vocative
+                cell renders the nominative Icelandic form rather than
+                nothing."""
                 if case == 'vocative':
                     case = 'nominative'
                 if is_adj:
-                    return is_adj.get((case, gender, number))
+                    return is_adj.get((degree, case, gender, number))
                 if is_decl:
                     forms = is_decl.get((case, number))
                     return _is_definite_suffix_form(*forms) if forms else None
                 return None
+
+            # Icelandic (unlike Greek's synthetic -teros/-tatos suffixes)
+            # marks comparative/superlative with a wholly different
+            # declension paradigm (vitur/vitrari/vitrastur), so each
+            # attested Greek degree gets its OWN table rather than being
+            # folded into the positive-degree one.
+            _DEGREE_HEADINGS = {
+                'positive': 'Beygingar / Declension',
+                'comparative': 'Miðstig / Comparative',
+                'superlative': 'Efsta stig / Superlative',
+            }
+
+            def _render_declension_table(degree, table_gender):
+                is_ref = is_adj or is_decl
+                xml.write('        <div class="morph-section">\n')
+                xml.write(f'            <p class="morph-label">{_DEGREE_HEADINGS[degree]}</p>\n')
+                xml.write('            <table class="morphology-table">\n')
+                xml.write('                <tr><th>Fall</th><th>Eintala</th><th>Tvítala</th><th>Fleirtala</th></tr>\n')
+
+                any_row = False
+                for c in ['nominative', 'genitive', 'dative', 'accusative', 'vocative']:
+                    cells = []
+                    any_form = False
+                    for num in ('singular', 'dual', 'plural'):
+                        key = (degree, c, table_gender, num)
+                        gk = ", ".join(sorted(noun_grid.get(key, []))) or '—'
+                        if noun_grid.get(key):
+                            any_form = True
+                        rend = _nominal_rendering(c, table_gender, num, degree)
+                        if rend:
+                            gk += f'<br/><span class="is-gloss-form">{html.escape(rend, quote=False)}</span>'
+                        cells.append(gk)
+                    if not any_form:
+                        continue
+                    any_row = True
+                    label = CASE_LABELS_IS.get(c, c.capitalize())
+                    xml.write(f'                <tr><td class="case-label">{label}</td>'
+                              f'<td>{cells[0]}</td><td>{cells[1]}</td><td>{cells[2]}</td></tr>\n')
+
+                xml.write('            </table>\n')
+                if is_ref and degree == 'positive':
+                    kind = 'lýsingarorð' if is_adj else 'orð'
+                    xml.write(f'            <p class="morph-note">Íslenskt viðmiðunar{kind}: '
+                              f'<b>{html.escape(is_word, quote=False)}</b> (skv. BÍN).</p>\n')
+                xml.write('        </div>\n')
+                return any_row
 
             if is_noun_adj and noun_grid:
                 # The table cites one gender: an adjective its masculine
@@ -1273,40 +1344,15 @@ def build_dictionary():
                 table_gender = ('masculine' if is_adj
                                 else (next(iter(noun_genders)) if len(noun_genders) == 1
                                       else 'masculine'))
-                is_ref = is_adj or is_decl
-                xml.write('        <div class="morph-section">\n')
-                xml.write('            <p class="morph-label">Beygingar / Declension</p>\n')
-                xml.write('            <table class="morphology-table">\n')
-                xml.write('                <tr><th>Fall</th><th>Eintala</th><th>Tvítala</th><th>Fleirtala</th></tr>\n')
+                _render_declension_table('positive', table_gender)
+                for degree in ('comparative', 'superlative'):
+                    if degree in adj_degrees:
+                        _render_declension_table(degree, table_gender)
 
-                for c in ['nominative', 'genitive', 'dative', 'accusative', 'vocative']:
-                    cells = []
-                    any_form = False
-                    for num in ('singular', 'dual', 'plural'):
-                        gk = ", ".join(sorted(noun_grid.get((c, table_gender, num), []))) or '—'
-                        if noun_grid.get((c, table_gender, num)):
-                            any_form = True
-                        rend = _nominal_rendering(c, table_gender, num)
-                        if rend:
-                            gk += f'<br/><span class="is-gloss-form">{html.escape(rend, quote=False)}</span>'
-                        cells.append(gk)
-                    if not any_form:
-                        continue
-                    label = CASE_LABELS_IS.get(c, c.capitalize())
-                    xml.write(f'                <tr><td class="case-label">{label}</td>'
-                              f'<td>{cells[0]}</td><td>{cells[1]}</td><td>{cells[2]}</td></tr>\n')
-
-                xml.write('            </table>\n')
-                if is_ref:
-                    kind = 'lýsingarorð' if is_adj else 'orð'
-                    xml.write(f'            <p class="morph-note">Íslenskt viðmiðunar{kind}: '
-                              f'<b>{html.escape(is_word, quote=False)}</b> (skv. BÍN).</p>\n')
-                xml.write('        </div>\n')
-
-                # Stubs for every attested (case, gender, number) form.
-                for (c, g, num), raws in noun_grid_raw.items():
-                    rend = _nominal_rendering(c, g, num)
-                    tags = _dual_tag(case=c, gender=g, number=num)
+                # Stubs for every attested (degree, case, gender, number) form.
+                for (degree, c, g, num), raws in noun_grid_raw.items():
+                    rend = _nominal_rendering(c, g, num, degree)
+                    tags = _dual_tag(case=c, gender=g, number=num, degree=degree)
                     for raw_form in raws:
                         register_stub(raw_form, representative_lemma, entry_id, tags, rend)
 

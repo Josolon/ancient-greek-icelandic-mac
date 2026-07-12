@@ -11894,6 +11894,14 @@ hlutfall	genitive	plural	hlutfalla	hlutfallanna
 hlutfall	genitive	singular	hlutfalls	hlutfallsins
 hlutfall	nominative	plural	hlutföll	hlutföllin
 hlutfall	nominative	singular	hlutfall	hlutfallið
+hluti	accusative	plural	hluta	hlutana
+hluti	accusative	singular	hluta	hlutann
+hluti	dative	plural	hlutum	hlutunum
+hluti	dative	singular	hluta	hlutanum
+hluti	genitive	plural	hluta	hlutanna
+hluti	genitive	singular	hluta	hlutans
+hluti	nominative	plural	hlutar	hlutarnir
+hluti	nominative	singular	hluti	hlutinn
 hlutur	accusative	plural	hluti	hlutina
 hlutur	accusative	singular	hlut	hlutinn
 hlutur	dative	plural	hlutum	hlutunum
