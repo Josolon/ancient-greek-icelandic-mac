@@ -4,19 +4,19 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
+	<key>CFBundleDisplayName</key>
+	<string>Grc-ís</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.jonatansolon.dictionary.AncientGreekIcelandic</string>
 	<key>CFBundleName</key>
-	<string>Ancient Greek-Icelandic</string>
-	<key>CFBundleDisplayName</key>
-	<string>Forngríska (LSJ) - Íslenska</string>
+	<string>Grc-ís</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
 	<key>DCSDictionaryCopyright</key>
 	<string>LSJ data: Liddell-Scott-Jones (Chicago Digital Classics/Perseus). Icelandic glosses bridge-translated via the CLARIN IS-EN glossary. Curated by Jonatan Solon.</string>
-	<key>DCSDictionaryManufacturerName</key>
-	<string>Jónatan Sólon</string>
 	<key>DCSDictionaryFrontMatterWindowSize</key>
 	<string>0.5</string>
+	<key>DCSDictionaryManufacturerName</key>
+	<string>Jónatan Sólon</string>
 </dict>
 </plist>
