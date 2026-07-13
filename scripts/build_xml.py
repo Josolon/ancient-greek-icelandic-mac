@@ -875,7 +875,7 @@ def write_pronunciation_guide_entry(xml):
     xml.write('        <p class="entry-preamble">Handbók fyrir íslenskumælandi</p>\n')
     xml.write('        <div class="definition">\n')
     xml.write(
-        '            <p class="gloss-is">Attískur fimmtu aldar (f. Kr.) framburður. Gefin '
+        '            <p class="gloss-is">Attískur fimmtu/fjórðu aldar (f. Kr.) framburður. Gefin '
         'eru framburðardæmi á íslensku þar sem hægt er. Röddun skortir í íslensku en með '
         'þekkingu á ensku eða frönsku má framkalla hana. Þá eru stuttu e- og o-hljóðin '
         'frábrugðin þeim íslensku en aftur má leita til ensku eða þýsku.</p>\n')
