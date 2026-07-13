@@ -793,11 +793,11 @@ _PRONUNCIATION_VOWELS = [
     ("ει á undan sérhljóða", "/ej/", "eyj í eyja."),
     ("ευ", "/eu/", "e-ú / \"e-u\" (stutt lokað e yfir í stutt ú)"),
     ("η", "/ɛː/", "e í vegur (opið)"),
-    ("ῃ", "/ɛːi/", "e-ey í le-eysa (ýkt langt opið e)"),
+    ("ῃ", "/ɛːi/", "e-ey í le-eysa (ýkt langt opið ei)"),
     ("ηυ", "/ɛːu/", "e-ú í \"le-úsa\" (langt opið e yfir í stutt ú)"),
     ("ῐ", "/i/", "í í ískra (stutt)"),
     ("ῑ", "/iː/", "ý í nýta (langt)"),
-    ("ο", "/o/", "o í þ. Gott (lokað, stutt)"),
+    ("ο", "/o/", "<i>o</i> í þ. Gott (lokað, stutt); <i>o</i> í [ou] = ó"),
     ("οι", "/oi/", "<i>au</i> í haust (eða <i>og</i> í bogi)"),
     ("ου", "/uː/", "ú í núna (langt)"),
     ("υ", "/y/", "u í undra (stutt)"),
@@ -805,7 +805,7 @@ _PRONUNCIATION_VOWELS = [
     ("υι", "/yi/", "ug í hugi"),
     ("ω", "/ɔː/", "o í nota"),
     ("ῳ", "/ɔːi/", "og í bogi (ýkt langt opið o)"),
-    ("ωυ", "/ɔːu/", "ó í ól (langt)"),
+    ("ωυ", "/ɔːu/", "o-ó í ostur og ól (ýkt djúpt og langt ó)"),
 ]
 _PRONUNCIATION_CONSONANTS = [
     ("῾", "/h/", "h í hestur"),

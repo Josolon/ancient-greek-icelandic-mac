@@ -33,6 +33,7 @@ import unicodedata
 from collections import defaultdict
 
 from greek_normalize import dedup_accent_variants
+from build_xml import write_pronunciation_guide_entry
 
 IS_DB_PATH = "data/lsj_is.db"
 OUTPUT_XML_PATH = "src/IcelandicGreekDictionary.xml"
@@ -96,6 +97,8 @@ def build_reverse_index():
 
             if (i + 1) % 2000 == 0:
                 print(f"   ... {i + 1}/{len(is_to_greek)}")
+
+        write_pronunciation_guide_entry(xml)
 
         xml.write('</d:dictionary>\n')
 
